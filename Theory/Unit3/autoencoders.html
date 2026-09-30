@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Autoencoder Demo – Learn by Playing</title>
+    <style>
+        /* ---------- global ---------- */
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        body {
+            background: #f4f7fc;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .card {
+            max-width: 1200px;
+            width: 100%;
+            background: white;
+            padding: 28px 32px 36px;
+            border-radius: 40px;
+            box-shadow: 0 20px 60px rgba(0, 20, 50, 0.12);
+            transition: 0.25s;
+        }
+        h1 {
+            font-weight: 600;
+            font-size: 1.9rem;
+            letter-spacing: -0.5px;
+            color: #0b1a33;
+            margin: 0 0 4px 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        h1 small {
+            font-size: 0.9rem;
+            font-weight: 400;
+            color: #4a6a8b;
+            letter-spacing: 0;
+            background: #eaf0f8;
+            padding: 2px 16px;
+            border-radius: 40px;
+        }
+        .sub {
+            color: #3b5b7a;
+            margin: 0 0 22px 0;
+            font-size: 1rem;
+            border-left: 4px solid #6b9bdb;
+            padding-left: 16px;
+            background: #f0f6fe;
+            border-radius: 0 20px 20px 0;
+            line-height: 1.5;
+        }
+        .sub strong {
+            color: #0b2b4a;
+        }
+
+        /* ---------- layout ---------- */
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 28px 40px;
+            justify-content: center;
+            margin-top: 8px;
+        }
+        .col {
+            flex: 1 1 220px;
+            min-width: 180px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .col-wide {
+            flex: 2 1 340px;
+            min-width: 240px;
+        }
+
+        /* ---------- grids ---------- */
+        .grid-wrap {
+            background: #ffffff;
+            border-radius: 28px;
+            padding: 16px 16px 14px;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.04);
+            border: 1px solid #e2ebf6;
+            width: 100%;
+            max-width: 300px;
+            text-align: center;
+        }
+        .grid-wrap .label {
+            font-weight: 500;
+            font-size: 0.85rem;
+            color: #1f3b5c;
+            letter-spacing: 0.3px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .grid-wrap .label .badge {
+            background: #dce6f2;
+            padding: 0 12px;
+            border-radius: 30px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #1f4468;
+        }
+        canvas.grid-canvas {
+            display: block;
+            width: 100%;
+            aspect-ratio: 1/1;
+            border-radius: 18px;
+            background: #fafcff;
+            border: 1px solid #dde7f2;
+            image-rendering: crisp-edges;
+            image-rendering: pixelated;
+            touch-action: none;
+            cursor: crosshair;
+        }
+
+        /* ---------- latent scatter ---------- */
+        .scatter-wrap {
+            background: #ffffff;
+            border-radius: 28px;
+            padding: 16px 16px 14px;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.04);
+            border: 1px solid #e2ebf6;
+            width: 100%;
+            max-width: 360px;
+            text-align: center;
+        }
+        .scatter-wrap .label {
+            font-weight: 500;
+            font-size: 0.85rem;
+            color: #1f3b5c;
+            letter-spacing: 0.3px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        canvas#latentCanvas {
+            display: block;
+            width: 100%;
+            aspect-ratio: 1/1;
+            border-radius: 18px;
+            background: #fafcff;
+            border: 1px solid #dde7f2;
+            image-rendering: crisp-edges;
+        }
+
+        /* ---------- controls ---------- */
+        .controls {
+            margin-top: 28px;
+            padding-top: 22px;
+            border-top: 1px solid #e2ebf6;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px 32px;
+            align-items: flex-end;
+            justify-content: center;
+        }
+        .ctrl-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 120px;
+            flex: 1 0 130px;
+        }
+        .ctrl-group label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #2e4f72;
+            display: flex;
+            justify-content: space-between;
+        }
+        .ctrl-group label span {
+            font-weight: 400;
+            color: #5a7e9e;
+        }
+        .ctrl-group input[type="range"] {
+            width: 100%;
+            height: 5px;
+            -webkit-appearance: none;
+            background: #d5e0ed;
+            border-radius: 10px;
+            outline: none;
+        }
+        .ctrl-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #2a6bb0;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(26, 80, 150, 0.25);
+            transition: 0.1s;
+        }
+        .ctrl-group input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.12);
+            background: #1f5a9e;
+        }
+        .ctrl-group select {
+            padding: 6px 12px;
+            border-radius: 30px;
+            border: 1px solid #cddcee;
+            background: white;
+            font-weight: 500;
+            color: #1a3452;
+            font-size: 0.9rem;
+            outline: none;
+            cursor: pointer;
+        }
+        .ctrl-group select:focus {
+            border-color: #2a6bb0;
+            box-shadow: 0 0 0 3px rgba(42, 107, 176, 0.15);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-top: 4px;
+        }
+        .btn {
+            padding: 8px 22px;
+            border-radius: 40px;
+            border: none;
+            font-weight: 600;
+            font-size: 0.85rem;
+            background: #eaf0f8;
+            color: #1a3c60;
+            cursor: pointer;
+            transition: 0.15s;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+        }
+        .btn:hover {
+            background: #d5e2f2;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(26, 80, 150, 0.12);
+        }
+        .btn-primary {
+            background: #1f5a9e;
+            color: white;
+            box-shadow: 0 4px 12px rgba(26, 80, 150, 0.25);
+        }
+        .btn-primary:hover {
+            background: #184a82;
+            box-shadow: 0 6px 20px rgba(26, 80, 150, 0.30);
+        }
+        .btn-success {
+            background: #1c8b4a;
+            color: white;
+            box-shadow: 0 4px 12px rgba(28, 139, 74, 0.25);
+        }
+        .btn-success:hover {
+            background: #15753d;
+        }
+        .btn-danger {
+            background: #c03a4a;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #a62f3d;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            pointer-events: none;
+            transform: none !important;
+        }
+
+        /* ---------- status ---------- */
+        .status {
+            margin-top: 18px;
+            text-align: center;
+            font-size: 0.9rem;
+            color: #2d4b6e;
+            background: #f0f6fe;
+            padding: 10px 18px;
+            border-radius: 40px;
+            display: inline-block;
+        }
+        .status .loss {
+            font-weight: 600;
+            color: #1b4f7a;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ---------- responsive ---------- */
+        @media (max-width: 700px) {
+            .card {
+                padding: 18px 16px 24px;
+            }
+            h1 {
+                font-size: 1.4rem;
+            }
+            .row {
+                gap: 18px;
+            }
+            .col,
+            .col-wide {
+                flex: 1 1 100%;
+                max-width: 380px;
+            }
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .ctrl-group {
+                flex: 1 1 auto;
+            }
+        }
+
+        /* ---------- tooltip ---------- */
+        .hint {
+            font-size: 0.7rem;
+            color: #5c7f9e;
+            margin-top: 6px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+
+        <h1>
+            🧠 Autoencoder
+            <small>compress → reconstruct</small>
+        </h1>
+        <div class="sub">
+            <strong>Input</strong> (left) is compressed into a <strong>latent code</strong> (middle),
+            then <strong>reconstructed</strong> (right). Adjust sliders to see how the bottleneck affects quality.
+        </div>
+
+        <!-- main visual row -->
+        <div class="row">
+
+            <!-- INPUT -->
+            <div class="col">
+                <div class="grid-wrap">
+                    <div class="label">
+                        <span>📥 Input</span>
+                        <span class="badge" id="inputLabel">8×8</span>
+                    </div>
+                    <canvas id="inputCanvas" class="grid-canvas" width="80" height="80"></canvas>
+                    <div class="hint">click a cell to toggle</div>
+                </div>
+            </div>
+
+            <!-- LATENT SPACE -->
+            <div class="col-wide">
+                <div class="scatter-wrap">
+                    <div class="label">
+                        <span>🌀 Latent space <span style="font-weight:400;font-size:0.7rem;">(2D projection)</span></span>
+                        <span class="badge" id="latentDimLabel">dim=2</span>
+                    </div>
+                    <canvas id="latentCanvas" width="200" height="200"></canvas>
+                    <div class="hint">each dot is a training sample · <span id="latentStatus">hover to see values</span></div>
+                </div>
+            </div>
+
+            <!-- RECONSTRUCTION -->
+            <div class="col">
+                <div class="grid-wrap">
+                    <div class="label">
+                        <span>📤 Reconstruction</span>
+                        <span class="badge" id="reconLabel">MSE: —</span>
+                    </div>
+                    <canvas id="reconCanvas" class="grid-canvas" width="80" height="80"></canvas>
+                    <div class="hint">quality depends on latent size</div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- controls -->
+        <div class="controls">
+
+            <div class="ctrl-group">
+                <label>🧩 Latent dim <span id="latentVal">2</span></label>
+                <input type="range" id="latentSlider" min="1" max="8" value="2" step="1" />
+            </div>
+
+            <div class="ctrl-group">
+                <label>⚡ Learning rate <span id="lrVal">0.05</span></label>
+                <input type="range" id="lrSlider" min="1" max="50" value="10" step="1" />
+            </div>
+
+            <div class="ctrl-group">
+                <label>🔁 Training steps <span id="stepsVal">200</span></label>
+                <input type="range" id="stepsSlider" min="10" max="600" value="200" step="10" />
+            </div>
+
+            <div class="ctrl-group">
+                <label>🎨 Shape</label>
+                <select id="shapeSelect">
+                    <option value="circle">● Circle</option>
+                    <option value="square">■ Square</option>
+                    <option value="triangle">▲ Triangle</option>
+                    <option value="diamond">◆ Diamond</option>
+                    <option value="cross">✚ Cross</option>
+                    <option value="ring">◎ Ring</option>
+                </select>
+            </div>
+
+            <div class="ctrl-group" style="flex: 0 0 auto;">
+                <label>&nbsp;</label>
+                <div class="btn-group">
+                    <button class="btn btn-primary" id="trainBtn">▶ Train</button>
+                    <button class="btn" id="resetBtn">↺ Reset</button>
+                    <button class="btn" id="randomBtn">🎲 Random</button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- status -->
+        <div style="text-align:center; margin-top: 10px;">
+            <span class="status" id="statusText">
+                ⚡ <span class="loss" id="lossDisplay">—</span> &nbsp;·&nbsp; samples: <span id="sampleCount">0</span>
+            </span>
+        </div>
+
+    </div>
+
+    <script>
+        // --------------------------------------------------------------
+        //  1.  CONFIG
+        // --------------------------------------------------------------
+        const GRID = 8; // 8×8 pixels
+        const TOTAL = GRID * GRID;
+
+        // --------------------------------------------------------------
+        //  2.  CANVAS REFS
+        // --------------------------------------------------------------
+        const inputCanvas = document.getElementById('inputCanvas');
+        const reconCanvas = document.getElementById('reconCanvas');
+        const latentCanvas = document.getElementById('latentCanvas');
+
+        const ctxIn = inputCanvas.getContext('2d');
+        const ctxRecon = reconCanvas.getContext('2d');
+        const ctxLatent = latentCanvas.getContext('2d');
+
+        // --------------------------------------------------------------
+        //  3.  STATE
+        // --------------------------------------------------------------
+        let latentDim = 2; // bottleneck size
+        let lr = 0.05;
+        let steps = 200;
+
+        // Weights for the autoencoder: linear encoder + decoder
+        // Encoder: W1 (latentDim × TOTAL), b1 (latentDim)
+        // Decoder: W2 (TOTAL × latentDim), b2 (TOTAL)
+        let W1, b1, W2, b2;
+
+        // Dataset: we store all training patterns (flattened)
+        let allPatterns = []; // array of Float32Array (length TOTAL)
+        let patternLabels = [];
+
+        // Current input pattern (user-editable)
+        let currentInput = new Float32Array(TOTAL);
+
+        // Training status
+        let isTraining = false;
+        let trainingTimer = null;
+
+        // --------------------------------------------------------------
+        //  4.  HELPERS – draw grid on canvas
+        // --------------------------------------------------------------
+        function drawGrid(canvas, data, highlight = null) {
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+            const cell = w / GRID;
+
+            ctx.clearRect(0, 0, w, h);
+
+            for (let r = 0; r < GRID; r++) {
+                for (let c = 0; c < GRID; c++) {
+                    const idx = r * GRID + c;
+                    const val = Math.min(1, Math.max(0, data[idx] || 0));
+                    const bright = Math.round(255 * val);
+                    ctx.fillStyle = `rgb(${bright},${bright},${bright})`;
+                    ctx.fillRect(c * cell, r * cell, cell, cell);
+
+                    // grid lines
+                    ctx.strokeStyle = 'rgba(180,195,215,0.35)';
+                    ctx.lineWidth = 0.5;
+                    ctx.strokeRect(c * cell, r * cell, cell, cell);
+                }
+            }
+
+            // highlight border if provided
+            if (highlight) {
+                const idx = highlight;
+                const r = Math.floor(idx / GRID);
+                const c = idx % GRID;
+                ctx.strokeStyle = '#ff4d6d';
+                ctx.lineWidth = 2.5;
+                ctx.strokeRect(c * cell, r * cell, cell, cell);
+            }
+        }
+
+        // --------------------------------------------------------------
+        //  5.  SHAPE GENERATORS (return Float32Array length TOTAL)
+        // --------------------------------------------------------------
+        function shapeCircle() {
+            const d = new Float32Array(TOTAL);
+            const cx = GRID / 2,
+                cy = GRID / 2,
+                radius = GRID * 0.32;
+            for (let r = 0; r < GRID; r++) {
+                for (let c = 0; c < GRID; c++) {
+                    const dist = Math.hypot(r - cy, c - cx);
+                    d[r * GRID + c] = Math.max(0, 1 - dist / radius);
+                }
+            }
+            return d;
+        }
+
+        function shapeSquare() {
+            const d = new Float32Array(TOTAL);
+            const half = GRID * 0.28;
+            const cx = GRID / 2,
+                cy = GRID / 2;
+            for (let r = 0; r < GRID; r++) {
+                for (let c = 0; c < GRID; c++) {
+                    const dx = Math.abs(c - cx),
+                        dy = Math.abs(r - cy);
+                    const val = Math.max(0, 1 - Math.max(dx / half, dy / half));
+                    d[r * GRID + c] = val;
+                }
+            }
+            return d;
+        }
+
+        function shapeTriangle() {
+            const d = new Float32Array(TOTAL);
+            const cx = GRID / 2,
+                cy = GRID / 2;
+            const size = GRID * 0.38;
+            for (let r = 0; r < GRID; r++) {
+                for (let c = 0; c < GRID; c++) {
+                    const x = (c - cx) / size,
+                        y = (r - cy) / size;
+                    const val = Math.max(0, 1 - Math.max(Math.abs(x) * 0.8 + y * 0.6, -y * 0.5 + 0.5));
+                    d[r * GRID + c] = Math.min(1, Math.max(0, val));
+                }
+            }
+            return d;
+        }
+
+        function shapeDiamond() {
+            const d = new Float32Array(TOTAL);
+            const cx = GRID / 2,
+                cy = GRID / 2;
+            const size = GRID * 0.32;
+            for (let r = 0; r < GRID; r++) {
+                for (let c = 0; c < GRID; c++) {
+                    const dx = Math.abs(c - cx),
+                        dy = Math.abs(r - cy);
+                    const val = Math.max(0, 1 - (dx + dy) / (size * 1.6));
+                    d[r * GRID + c] = val;
+                }
+            }
+            return d;
+        }
+
+        function shapeCross() {
+            const d = new Float32Array(TOTAL);
+            const cx = GRID / 2,
+                cy = GRID / 2;
+            const thick = GRID * 0.12;
+            const len = GRID * 0.38;
+            for (let r = 0; r < GRID; r++) {
+                for (let c = 0; c < GRID; c++) {
+                    const dx = Math.abs(c - cx),
+                        dy = Math.abs(r - cy);
+                    const inH = dx < len && dy < thick;
+                    const inV = dy < len && dx < thick;
+                    d[r * GRID + c] = (inH || inV) ? 1 : 0;
+                }
+            }
+            return d;
+        }
+
+        function shapeRing() {
+            const d = new Float32Array(TOTAL);
+            const cx = GRID / 2,
+                cy = GRID / 2;
+            const rOuter = GRID * 0.38;
+            const rInner = GRID * 0.22;
+            for (let r = 0; r < GRID; r++) {
+                for (let c = 0; c < GRID; c++) {
+                    const dist = Math.hypot(r - cy, c - cx);
+                    const val = (dist >= rInner && dist <= rOuter) ? 1 : 0;
+                    d[r * GRID + c] = val;
+                }
+            }
+            return d;
+        }
+
+        const shapeMap = {
+            circle: shapeCircle,
+            square: shapeSquare,
+            triangle: shapeTriangle,
+            diamond: shapeDiamond,
+            cross: shapeCross,
+            ring: shapeRing,
+        };
+
+        // --------------------------------------------------------------
+        //  6.  BUILD DATASET (with variations)
+        // --------------------------------------------------------------
+        function buildDataset() {
+            allPatterns = [];
+            patternLabels = [];
+
+            // For each shape type, generate several variations (shift, scale, noise)
+            const shapeNames = Object.keys(shapeMap);
+            for (const name of shapeNames) {
+                const base = shapeMap[name]();
+                // add 3 variations: slight shift + scale
+                for (let v = 0; v < 4; v++) {
+                    const shifted = new Float32Array(TOTAL);
+                    const shiftX = (Math.random() - 0.5) * 1.2;
+                    const shiftY = (Math.random() - 0.5) * 1.2;
+                    const scale = 0.85 + Math.random() * 0.3;
+                    for (let r = 0; r < GRID; r++) {
+                        for (let c = 0; c < GRID; c++) {
+                            const srcR = (r - GRID / 2) / scale + GRID / 2 + shiftY;
+                            const srcC = (c - GRID / 2) / scale + GRID / 2 + shiftX;
+                            // bilinear-ish sample
+                            const ri = Math.round(srcR),
+                                ci = Math.round(srcC);
+                            if (ri >= 0 && ri < GRID && ci >= 0 && ci < GRID) {
+                                shifted[r * GRID + c] = base[ri * GRID + ci];
+                            } else {
+                                shifted[r * GRID + c] = 0;
+                            }
+                        }
+                    }
+                    // clamp
+                    for (let i = 0; i < TOTAL; i++) shifted[i] = Math.min(1, Math.max(0, shifted[i]));
+                    // add a tiny bit of noise
+                    for (let i = 0; i < TOTAL; i++) {
+                        shifted[i] = Math.min(1, Math.max(0, shifted[i] + (Math.random() - 0.5) * 0.06));
+                    }
+                    allPatterns.push(shifted);
+                    patternLabels.push(name);
+                }
+            }
+            // also add the clean base shapes
+            for (const name of shapeNames) {
+                const base = shapeMap[name]();
+                const clean = new Float32Array(base);
+                allPatterns.push(clean);
+                patternLabels.push(name + '-clean');
+            }
+
+            document.getElementById('sampleCount').textContent = allPatterns.length;
+        }
+
+        // --------------------------------------------------------------
+        //  7.  INIT / RESET WEIGHTS
+        // --------------------------------------------------------------
+        function initWeights() {
+            // Xavier-ish init
+            const scale = Math.sqrt(2.0 / TOTAL);
+            W1 = new Float32Array(latentDim * TOTAL);
+            b1 = new Float32Array(latentDim);
+            W2 = new Float32Array(TOTAL * latentDim);
+            b2 = new Float32Array(TOTAL);
+
+            for (let i = 0; i < W1.length; i++) W1[i] = (Math.random() - 0.5) * scale * 2;
+            for (let i = 0; i < W2.length; i++) W2[i] = (Math.random() - 0.5) * scale * 2;
+            for (let i = 0; i < b1.length; i++) b1[i] = (Math.random() - 0.5) * 0.1;
+            for (let i = 0; i < b2.length; i++) b2[i] = (Math.random() - 0.5) * 0.1;
+        }
+
+        // --------------------------------------------------------------
+        //  8.  FORWARD PASS
+        // --------------------------------------------------------------
+        function encode(x) {
+            // x: Float32Array length TOTAL
+            const z = new Float32Array(latentDim);
+            for (let i = 0; i < latentDim; i++) {
+                let sum = b1[i];
+                for (let j = 0; j < TOTAL; j++) {
+                    sum += W1[i * TOTAL + j] * x[j];
+                }
+                z[i] = Math.max(0, sum); // ReLU
+            }
+            return z;
+        }
+
+        function decode(z) {
+            const out = new Float32Array(TOTAL);
+            for (let i = 0; i < TOTAL; i++) {
+                let sum = b2[i];
+                for (let j = 0; j < latentDim; j++) {
+                    sum += W2[i * latentDim + j] * z[j];
+                }
+                out[i] = 1 / (1 + Math.exp(-sum)); // sigmoid
+            }
+            return out;
+        }
+
+        function forward(x) {
+            const z = encode(x);
+            const recon = decode(z);
+            return { z, recon };
+        }
+
+        // --------------------------------------------------------------
+        //  9.  TRAIN ONE STEP (SGD)
+        // --------------------------------------------------------------
+        function trainStep(x, lrVal) {
+            // forward
+            const z = encode(x);
+            const recon = decode(z);
+
+            // compute gradients (manual backprop for linear + ReLU + sigmoid)
+            // loss: MSE = 1/2 * sum((x - recon)^2)
+            // dL/drecon = -(x - recon)
+            const dRecon = new Float32Array(TOTAL);
+            for (let i = 0; i < TOTAL; i++) {
+                dRecon[i] = -(x[i] - recon[i]);
+            }
+
+            // derivative of sigmoid: sig * (1 - sig)
+            const dSigmoid = new Float32Array(TOTAL);
+            for (let i = 0; i < TOTAL; i++) {
+                dSigmoid[i] = recon[i] * (1 - recon[i]);
+            }
+
+            // gradient w.r.t decoder input (z)
+            const dLoss_dZ = new Float32Array(latentDim);
+            for (let j = 0; j < latentDim; j++) {
+                let sum = 0;
+                for (let i = 0; i < TOTAL; i++) {
+                    sum += dRecon[i] * dSigmoid[i] * W2[i * latentDim + j];
+                }
+                dLoss_dZ[j] = sum;
+            }
+
+            // ReLU derivative for encoder: z > 0 ? 1 : 0
+            const dRelu = new Float32Array(latentDim);
+            for (let j = 0; j < latentDim; j++) {
+                dRelu[j] = z[j] > 0 ? 1 : 0;
+            }
+
+            // gradient w.r.t encoder weights
+            // dLoss/dW1[j][i] = dLoss_dZ[j] * dRelu[j] * x[i]
+            // dLoss/db1[j] = dLoss_dZ[j] * dRelu[j]
+            const dW1 = new Float32Array(W1.length);
+            const db1 = new Float32Array(latentDim);
+            for (let j = 0; j < latentDim; j++) {
+                const grad = dLoss_dZ[j] * dRelu[j];
+                db1[j] = grad;
+                for (let i = 0; i < TOTAL; i++) {
+                    dW1[j * TOTAL + i] = grad * x[i];
+                }
+            }
+
+            // gradient w.r.t decoder weights
+            // dLoss/dW2[i][j] = dRecon[i] * dSigmoid[i] * z[j]
+            // dLoss/db2[i] = dRecon[i] * dSigmoid[i]
+            const dW2 = new Float32Array(W2.length);
+            const db2 = new Float32Array(TOTAL);
+            for (let i = 0; i < TOTAL; i++) {
+                const grad = dRecon[i] * dSigmoid[i];
+                db2[i] = grad;
+                for (let j = 0; j < latentDim; j++) {
+                    dW2[i * latentDim + j] = grad * z[j];
+                }
+            }
+
+            // update weights
+            for (let i = 0; i < W1.length; i++) W1[i] -= lrVal * dW1[i];
+            for (let i = 0; i < b1.length; i++) b1[i] -= lrVal * db1[i];
+            for (let i = 0; i < W2.length; i++) W2[i] -= lrVal * dW2[i];
+            for (let i = 0; i < b2.length; i++) b2[i] -= lrVal * db2[i];
+
+            // compute MSE loss
+            let loss = 0;
+            for (let i = 0; i < TOTAL; i++) {
+                const diff = x[i] - recon[i];
+                loss += diff * diff;
+            }
+            loss /= TOTAL;
+            return loss;
+        }
+
+        // --------------------------------------------------------------
+        //  10. TRAINING LOOP
+        // --------------------------------------------------------------
+        function trainAutoencoder(iterations, lrVal, callback) {
+            if (allPatterns.length === 0) {
+                buildDataset();
+            }
+            let totalLoss = 0;
+            let count = 0;
+            for (let iter = 0; iter < iterations; iter++) {
+                // pick a random sample
+                const idx = Math.floor(Math.random() * allPatterns.length);
+                const pattern = allPatterns[idx];
+                const loss = trainStep(pattern, lrVal);
+                totalLoss += loss;
+                count++;
+                // every 10 steps, report
+                if (iter % 10 === 0 && callback) {
+                    callback(totalLoss / count, iter);
+                }
+            }
+            if (callback) {
+                callback(totalLoss / count, iterations);
+            }
+            return totalLoss / count;
+        }
+
+        // --------------------------------------------------------------
+        //  11. UPDATE VISUALIZATION
+        // --------------------------------------------------------------
+        function updateVisuals() {
+            // forward pass on current input
+            const { z, recon } = forward(currentInput);
+
+            // draw input
+            drawGrid(inputCanvas, currentInput);
+            drawGrid(reconCanvas, recon);
+
+            // compute MSE
+            let mse = 0;
+            for (let i = 0; i < TOTAL; i++) {
+                const d = currentInput[i] - recon[i];
+                mse += d * d;
+            }
+            mse /= TOTAL;
+            document.getElementById('reconLabel').textContent = `MSE: ${mse.toFixed(4)}`;
+
+            // draw latent space (2D projection)
+            drawLatentSpace(z);
+
+            // update loss display
+            document.getElementById('lossDisplay').textContent = mse.toFixed(4);
+        }
+
+        // --------------------------------------------------------------
+        //  12. LATENT SPACE VISUALIZATION
+        // --------------------------------------------------------------
+        function drawLatentSpace(currentZ) {
+            const w = latentCanvas.width;
+            const h = latentCanvas.height;
+            ctxLatent.clearRect(0, 0, w, h);
+
+            // background
+            ctxLatent.fillStyle = '#fafcff';
+            ctxLatent.fillRect(0, 0, w, h);
+
+            // draw all training samples in latent space
+            if (allPatterns.length > 0 && latentDim >= 2) {
+                // we need to encode all patterns
+                const points = [];
+                for (const pat of allPatterns) {
+                    const z = encode(pat);
+                    points.push(z);
+                }
+
+                // find bounds
+                let minX = Infinity,
+                    maxX = -Infinity,
+                    minY = Infinity,
+                    maxY = -Infinity;
+                for (const p of points) {
+                    if (p[0] < minX) minX = p[0];
+                    if (p[0] > maxX) maxX = p[0];
+                    if (p[1] < minY) minY = p[1];
+                    if (p[1] > maxY) maxY = p[1];
+                }
+                const rangeX = maxX - minX || 0.5;
+                const rangeY = maxY - minY || 0.5;
+                const pad = 0.15;
+                const scaleX = (w * (1 - pad * 2)) / rangeX;
+                const scaleY = (h * (1 - pad * 2)) / rangeY;
+                const offX = w * pad - minX * scaleX;
+                const offY = h * pad - minY * scaleY;
+
+                // draw all points (gray)
+                for (const p of points) {
+                    const px = p[0] * scaleX + offX;
+                    const py = p[1] * scaleY + offY;
+                    ctxLatent.beginPath();
+                    ctxLatent.arc(px, py, 3, 0, Math.PI * 2);
+                    ctxLatent.fillStyle = 'rgba(100,130,170,0.25)';
+                    ctxLatent.fill();
+                }
+
+                // draw current point (red)
+                if (currentZ && currentZ.length >= 2) {
+                    const px = currentZ[0] * scaleX + offX;
+                    const py = currentZ[1] * scaleY + offY;
+                    ctxLatent.beginPath();
+                    ctxLatent.arc(px, py, 8, 0, Math.PI * 2);
+                    ctxLatent.fillStyle = '#e63946';
+                    ctxLatent.fill();
+                    ctxLatent.strokeStyle = 'white';
+                    ctxLatent.lineWidth = 2.5;
+                    ctxLatent.stroke();
+
+                    // label
+                    ctxLatent.fillStyle = '#1a2f4a';
+                    ctxLatent.font = '11px sans-serif';
+                    ctxLatent.fillText(`(${currentZ[0].toFixed(2)}, ${currentZ[1].toFixed(2)})`, px + 12, py - 4);
+                }
+
+                // axis labels
+                ctxLatent.fillStyle = '#4a6a8b';
+                ctxLatent.font = '10px sans-serif';
+                ctxLatent.fillText('z₁', 6, 14);
+                ctxLatent.fillText('z₂', w - 20, h - 6);
+
+                document.getElementById('latentStatus').textContent =
+                    `samples: ${points.length} · current z₁=${currentZ?.[0]?.toFixed(3) ?? '—'}, z₂=${currentZ?.[1]?.toFixed(3) ?? '—'}`;
+            } else {
+                ctxLatent.fillStyle = '#9ab0cc';
+                ctxLatent.font = '14px sans-serif';
+                ctxLatent.textAlign = 'center';
+                ctxLatent.fillText(latentDim < 2 ? 'need dim ≥ 2' : 'no data', w / 2, h / 2);
+                document.getElementById('latentStatus').textContent = 'latent dimension < 2';
+            }
+        }
+
+        // --------------------------------------------------------------
+        //  13. SET CURRENT SHAPE
+        // --------------------------------------------------------------
+        function setShape(name) {
+            const gen = shapeMap[name];
+            if (!gen) return;
+            const shape = gen();
+            for (let i = 0; i < TOTAL; i++) {
+                currentInput[i] = shape[i];
+            }
+            updateVisuals();
+        }
+
+        // --------------------------------------------------------------
+        //  14. CLICK TO EDIT INPUT
+        // --------------------------------------------------------------
+        function handleCanvasClick(e) {
+            const rect = inputCanvas.getBoundingClientRect();
+            const scaleX = inputCanvas.width / rect.width;
+            const scaleY = inputCanvas.height / rect.height;
+            const mx = (e.clientX - rect.left) * scaleX;
+            const my = (e.clientY - rect.top) * scaleY;
+            const cell = inputCanvas.width / GRID;
+            const col = Math.min(GRID - 1, Math.floor(mx / cell));
+            const row = Math.min(GRID - 1, Math.floor(my / cell));
+            const idx = row * GRID + col;
+            // toggle: if > 0.5 set to 0 else set to 1
+            currentInput[idx] = currentInput[idx] > 0.5 ? 0 : 1;
+            updateVisuals();
+        }
+
+        inputCanvas.addEventListener('click', handleCanvasClick);
+
+        // --------------------------------------------------------------
+        //  15. UI BINDINGS
+        // --------------------------------------------------------------
+        const latentSlider = document.getElementById('latentSlider');
+        const lrSlider = document.getElementById('lrSlider');
+        const stepsSlider = document.getElementById('stepsSlider');
+        const shapeSelect = document.getElementById('shapeSelect');
+        const trainBtn = document.getElementById('trainBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const randomBtn = document.getElementById('randomBtn');
+
+        function readControls() {
+            latentDim = parseInt(latentSlider.value, 10);
+            lr = parseFloat(lrSlider.value) / 100;
+            steps = parseInt(stepsSlider.value, 10);
+            document.getElementById('latentVal').textContent = latentDim;
+            document.getElementById('lrVal').textContent = lr.toFixed(2);
+            document.getElementById('stepsVal').textContent = steps;
+            document.getElementById('latentDimLabel').textContent = `dim=${latentDim}`;
+        }
+
+        latentSlider.addEventListener('input', () => {
+            readControls();
+            // re-init weights with new latent dim
+            initWeights();
+            updateVisuals();
+        });
+
+        lrSlider.addEventListener('input', readControls);
+        stepsSlider.addEventListener('input', readControls);
+
+        shapeSelect.addEventListener('change', () => {
+            setShape(shapeSelect.value);
+        });
+
+        // --------------------------------------------------------------
+        //  16. TRAIN
+        // --------------------------------------------------------------
+        function runTraining() {
+            if (isTraining) return;
+            readControls();
+
+            if (allPatterns.length === 0) buildDataset();
+
+            isTraining = true;
+            trainBtn.textContent = '⏳ Training…';
+            trainBtn.disabled = true;
+
+            const totalSteps = steps;
+            let stepCount = 0;
+            let avgLoss = 0;
+
+            // disable interaction during training (except stop)
+            function trainStepCallback(loss, iter) {
+                stepCount = iter;
+                avgLoss = loss;
+                document.getElementById('lossDisplay').textContent = loss.toFixed(5);
+                document.getElementById('reconLabel').textContent = `MSE: ${loss.toFixed(4)}`;
+                // update visuals every 20 steps
+                if (iter % 20 === 0 || iter === totalSteps) {
+                    updateVisuals();
+                }
+                // progress
+                const pct = Math.min(100, Math.round((iter / totalSteps) * 100));
+                trainBtn.textContent = `⏳ ${pct}%`;
+            }
+
+            // run in chunks to keep UI responsive
+            const chunkSize = 20;
+
+            function trainChunk() {
+                if (stepCount >= totalSteps) {
+                    isTraining = false;
+                    trainBtn.textContent = '▶ Train';
+                    trainBtn.disabled = false;
+                    document.getElementById('lossDisplay').textContent = avgLoss.toFixed(5);
+                    updateVisuals();
+                    return;
+                }
+
+                const remaining = totalSteps - stepCount;
+                const chunk = Math.min(chunkSize, remaining);
+
+                // run chunk
+                for (let i = 0; i < chunk; i++) {
+                    const idx = Math.floor(Math.random() * allPatterns.length);
+                    const pattern = allPatterns[idx];
+                    const loss = trainStep(pattern, lr);
+                    avgLoss = avgLoss + (loss - avgLoss) / (stepCount + i + 1);
+                    stepCount++;
+                }
+
+                // update UI
+                const pct = Math.min(100, Math.round((stepCount / totalSteps) * 100));
+                trainBtn.textContent = `⏳ ${pct}%`;
+                document.getElementById('lossDisplay').textContent = avgLoss.toFixed(5);
+                document.getElementById('reconLabel').textContent = `MSE: ${avgLoss.toFixed(4)}`;
+                updateVisuals();
+
+                // schedule next chunk
+                if (stepCount < totalSteps) {
+                    setTimeout(trainChunk, 16);
+                } else {
+                    isTraining = false;
+                    trainBtn.textContent = '▶ Train';
+                    trainBtn.disabled = false;
+                    document.getElementById('lossDisplay').textContent = avgLoss.toFixed(5);
+                    updateVisuals();
+                }
+            }
+
+            trainChunk();
+        }
+
+        trainBtn.addEventListener('click', runTraining);
+
+        // --------------------------------------------------------------
+        //  17. RESET
+        // --------------------------------------------------------------
+        resetBtn.addEventListener('click', () => {
+            if (isTraining) return;
+            initWeights();
+            updateVisuals();
+            document.getElementById('lossDisplay').textContent = '—';
+            document.getElementById('reconLabel').textContent = 'MSE: —';
+        });
+
+        // --------------------------------------------------------------
+        //  18. RANDOM INPUT
+        // --------------------------------------------------------------
+        randomBtn.addEventListener('click', () => {
+            if (isTraining) return;
+            for (let i = 0; i < TOTAL; i++) {
+                currentInput[i] = Math.random() > 0.6 ? 1 : 0;
+            }
+            // make it look like a shape
+            // actually just random noise
+            updateVisuals();
+        });
+
+        // --------------------------------------------------------------
+        //  19. INIT
+        // --------------------------------------------------------------
+        function init() {
+            buildDataset();
+            readControls();
+            initWeights();
+            // set default shape
+            setShape('circle');
+            // add a few training steps to warm up
+            for (let i = 0; i < 30; i++) {
+                const idx = Math.floor(Math.random() * allPatterns.length);
+                trainStep(allPatterns[idx], 0.05);
+            }
+            updateVisuals();
+            document.getElementById('lossDisplay').textContent = '—';
+            document.getElementById('reconLabel').textContent = 'MSE: —';
+            // show sample count
+            document.getElementById('sampleCount').textContent = allPatterns.length;
+
+            // draw latent space
+            setTimeout(() => {
+                const { z } = forward(currentInput);
+                drawLatentSpace(z);
+            }, 100);
+        }
+
+        init();
+
+        // --------------------------------------------------------------
+        //  20. RESIZE HANDLING
+        // --------------------------------------------------------------
+        window.addEventListener('resize', () => {
+            // re-draw
+            updateVisuals();
+        });
+
+        console.log('🧠 Autoencoder demo ready!');
+        console.log(`📊 ${allPatterns.length} training samples, ${GRID}×${GRID} grid`);
+        console.log('🔧 Adjust sliders and click "Train" to see the autoencoder learn!');
+    </script>
+
+</body>
+</html>

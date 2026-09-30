@@ -1,0 +1,536 @@
+% Batch Normalization Tutorial
+% Standalone LaTeX document
+
+\documentclass[11pt,a4paper]{article}
+
+% ------------------------------------------------------------
+% Packages
+% ------------------------------------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{geometry}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{tcolorbox}
+\usepackage{tikz}
+\usepackage{hyperref}
+\usepackage{microtype}
+
+% ------------------------------------------------------------
+% Page setup
+% ------------------------------------------------------------
+\geometry{
+	top=1in,
+	bottom=1in,
+	left=0.85in,
+	right=0.85in
+}
+
+\hypersetup{
+	colorlinks=true,
+	linkcolor=blue!60!black,
+	urlcolor=blue!60!black
+}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+% ------------------------------------------------------------
+% Colors
+% ------------------------------------------------------------
+\definecolor{titleblue}{RGB}{20,75,125}
+\definecolor{lightblue}{RGB}{235,245,255}
+\definecolor{lightgreen}{RGB}{235,250,240}
+\definecolor{lightorange}{RGB}{255,246,225}
+\definecolor{lightpurple}{RGB}{245,240,255}
+\definecolor{lightred}{RGB}{255,240,240}
+
+% ------------------------------------------------------------
+% Custom boxes
+% ------------------------------------------------------------
+\newtcolorbox{keyidea}{
+	colback=lightblue,
+	colframe=titleblue,
+	boxrule=0.8pt,
+	arc=3pt,
+	title=\textbf{Key Idea}
+}
+
+\newtcolorbox{important}{
+	colback=lightorange,
+	colframe=orange!70!black,
+	boxrule=0.8pt,
+	arc=3pt,
+	title=\textbf{Important}
+}
+
+\newtcolorbox{intuition}{
+	colback=lightgreen,
+	colframe=green!50!black,
+	boxrule=0.8pt,
+	arc=3pt,
+	title=\textbf{Intuition}
+}
+
+\newtcolorbox{summarybox}{
+	colback=lightpurple,
+	colframe=purple!60!black,
+	boxrule=0.8pt,
+	arc=3pt,
+	title=\textbf{Quick Summary}
+}
+
+% ------------------------------------------------------------
+% Title
+% ------------------------------------------------------------
+\title{
+	\vspace{-1cm}
+	\textbf{\color{titleblue}Batch Normalization}\\[4pt]
+	\large A Short Tutorial for Deep Learning Students
+}
+\author{}
+\date{}
+
+\begin{document}
+	
+	\maketitle
+	
+	\begin{keyidea}
+		\textbf{Batch Normalization (BatchNorm)} is a technique used in deep
+		neural networks to normalize intermediate activations within a mini-batch.
+		It generally makes training faster, more stable, and less sensitive to
+		the choice of initialization.
+	\end{keyidea}
+	
+	\section{Why Batch Normalization?}
+	
+	Consider a neural network layer that receives an input $x$ and produces
+	an intermediate value
+	
+	\begin{equation}
+		z = Wx+b.
+	\end{equation}
+	
+	Here, $W$ represents the weights and $b$ represents the bias.
+	
+	During training, the weights of previous layers continuously change.
+	Consequently, the distribution and scale of the intermediate activations
+	can also change. Batch Normalization helps control these activations by
+	normalizing them using statistics computed from a mini-batch.
+	
+	\begin{intuition}
+		Imagine that one layer produces values that are sometimes very small and
+		sometimes very large. The next layer has to continuously adapt to these
+		changes. BatchNorm keeps the activations in a more controlled form before
+		passing them forward.
+	\end{intuition}
+	
+	\section{Input to Batch Normalization}
+	
+	Suppose a mini-batch contains $m$ training examples and the layer produces
+	$d$ features. The activations can be represented by the matrix
+	
+	\begin{equation}
+		Z =
+		\begin{bmatrix}
+			z_{11} & z_{12} & \cdots & z_{1d}\\
+			z_{21} & z_{22} & \cdots & z_{2d}\\
+			\vdots & \vdots & \ddots & \vdots\\
+			z_{m1} & z_{m2} & \cdots & z_{md}
+		\end{bmatrix}.
+	\end{equation}
+	
+	The rows correspond to training examples and the columns correspond to
+	features.
+	
+	For each feature $j$, BatchNorm calculates its statistics across the
+	$m$ examples in the mini-batch.
+	
+	\section{Step 1: Compute the Batch Mean}
+	
+	For feature $j$, the mean is calculated as
+	
+	\begin{equation}
+		\mu_j =
+		\frac{1}{m}
+		\sum_{i=1}^{m} z_{ij}.
+	\end{equation}
+	
+	Thus, every feature has its own mean.
+	
+	For example, if the layer has three features, we calculate
+	
+	\[
+	\mu_1,\qquad \mu_2,\qquad \mu_3.
+	\]
+	
+	\section{Step 2: Compute the Batch Variance}
+	
+	The variance for feature $j$ is
+	
+	\begin{equation}
+		\sigma_j^2 =
+		\frac{1}{m}
+		\sum_{i=1}^{m}
+		(z_{ij}-\mu_j)^2.
+	\end{equation}
+	
+	The mean tells us where the activations are centered, while the variance
+	tells us how much they are spread out.
+	
+	\begin{important}
+		The mean and variance are computed separately for each feature, using the
+		examples in the current mini-batch.
+	\end{important}
+	
+	\section{Step 3: Normalize the Activations}
+	
+	Once the mean and variance are available, each activation is normalized as
+	
+	\begin{equation}
+		\hat{z}_{ij}
+		=
+		\frac{z_{ij}-\mu_j}
+		{\sqrt{\sigma_j^2+\epsilon}},
+	\end{equation}
+	
+	where $\epsilon$ is a small positive number added for numerical stability.
+	
+	The purpose of this operation is to approximately obtain
+	
+	\begin{equation}
+		\mathbb{E}[\hat{z}_j]\approx 0,
+		\qquad
+		\operatorname{Var}(\hat{z}_j)\approx 1.
+	\end{equation}
+	
+	The normalized activations can be written as
+	
+	\begin{equation}
+		\hat{Z} =
+		\begin{bmatrix}
+			\hat{z}_{11} & \hat{z}_{12} & \cdots & \hat{z}_{1d}\\
+			\hat{z}_{21} & \hat{z}_{22} & \cdots & \hat{z}_{2d}\\
+			\vdots & \vdots & \ddots & \vdots\\
+			\hat{z}_{m1} & \hat{z}_{m2} & \cdots & \hat{z}_{md}
+		\end{bmatrix}.
+	\end{equation}
+	
+	\section{Step 4: Scale and Shift}
+	
+	If BatchNorm always forced every feature to have mean $0$ and variance
+	$1$, it could unnecessarily restrict what the network can learn.
+	
+	Therefore, BatchNorm introduces two learnable parameters:
+	
+	\begin{itemize}[leftmargin=1.5em]
+		\item $\gamma_j$: learnable scale parameter,
+		\item $\beta_j$: learnable shift parameter.
+	\end{itemize}
+	
+	The final BatchNorm output is
+	
+	\begin{equation}
+		\boxed{
+			y_{ij} = \gamma_j\hat{z}_{ij}+\beta_j
+		}
+	\end{equation}
+	
+	The parameters $\gamma_j$ and $\beta_j$ are learned during training using
+	backpropagation.
+	
+	\begin{intuition}
+		Normalization provides a convenient standard form, while $\gamma$ and
+		$\beta$ give the network the freedom to learn the scale and position that
+		are useful for the task.
+	\end{intuition}
+	
+	\section{Complete Batch Normalization Formula}
+	
+	The complete process can be summarized as follows.
+	
+	\subsection*{1. Compute the mean}
+	
+	\begin{equation}
+		\mu_j =
+		\frac{1}{m}\sum_{i=1}^{m}z_{ij}.
+	\end{equation}
+	
+	\subsection*{2. Compute the variance}
+	
+	\begin{equation}
+		\sigma_j^2 =
+		\frac{1}{m}
+		\sum_{i=1}^{m}(z_{ij}-\mu_j)^2.
+	\end{equation}
+	
+	\subsection*{3. Normalize}
+	
+	\begin{equation}
+		\hat{z}_{ij}
+		=
+		\frac{z_{ij}-\mu_j}
+		{\sqrt{\sigma_j^2+\epsilon}}.
+	\end{equation}
+	
+	\subsection*{4. Scale and shift}
+	
+	\begin{equation}
+		\boxed{
+			y_{ij}=\gamma_j\hat{z}_{ij}+\beta_j
+		}
+	\end{equation}
+	
+	Thus,
+	
+	\begin{equation}
+		\boxed{
+			z
+			\longrightarrow
+			\text{Mean/Variance}
+			\longrightarrow
+			\text{Normalize}
+			\longrightarrow
+			\text{Scale and Shift}
+			\longrightarrow
+			y
+		}
+	\end{equation}
+	
+	\section{BatchNorm in a Neural Network}
+	
+	A common arrangement in a neural network is
+	
+	\begin{equation}
+		\boxed{
+			\text{Input}
+			\rightarrow
+			\text{Linear Layer}
+			\rightarrow
+			\text{BatchNorm}
+			\rightarrow
+			\text{ReLU}
+			\rightarrow
+			\text{Next Layer}
+		}
+	\end{equation}
+	
+	For example,
+	
+	\[
+	x
+	\rightarrow
+	(Wx+b)
+	\rightarrow
+	\operatorname{BatchNorm}
+	\rightarrow
+	\operatorname{ReLU}.
+	\]
+	
+	The BatchNorm operation is therefore performed on the intermediate
+	activations before they are passed to the activation function and the
+	subsequent layer.
+	
+	\section{Training Versus Inference}
+	
+	One of the most important concepts in BatchNorm is that the statistics
+	used during training and inference are different.
+	
+	\subsection{During Training}
+	
+	During training, the mean and variance are calculated from the current
+	mini-batch:
+	
+	\begin{equation}
+		\mu_j=\mu_{j,\mathrm{batch}},
+		\qquad
+		\sigma_j^2=\sigma_{j,\mathrm{batch}}^2.
+	\end{equation}
+	
+	At the same time, BatchNorm maintains running estimates of these
+	statistics, commonly using an exponential moving average.
+	
+	\subsection{During Inference}
+	
+	During testing or inference, the model should not depend on the particular
+	examples present in a mini-batch. Therefore, the stored running estimates
+	are used:
+	
+	\begin{equation}
+		y =
+		\gamma
+		\frac{z-\mu_{\mathrm{running}}}
+		{\sqrt{\sigma_{\mathrm{running}}^2+\epsilon}}
+		+\beta.
+	\end{equation}
+	
+	The learned $\gamma$ and $\beta$ parameters are used as fixed parameters
+	during inference.
+	
+	\begin{important}
+		A common mistake is to use the statistics of the current test example
+		during inference. BatchNorm normally uses the running mean and variance
+		estimated during training.
+	\end{important}
+	
+	\section{Benefits of Batch Normalization}
+	
+	BatchNorm can provide several practical benefits:
+	
+	\begin{enumerate}[leftmargin=1.8em]
+		\item \textbf{Faster convergence:}
+		Training often converges more quickly.
+		
+		\item \textbf{More stable training:}
+		The scale of intermediate activations is controlled.
+		
+		\item \textbf{Higher learning rates:}
+		The network can often tolerate relatively larger learning rates.
+		
+		\item \textbf{Regularization effect:}
+		The randomness introduced by mini-batch statistics can sometimes
+		reduce overfitting.
+		
+		\item \textbf{Reduced sensitivity to initialization:}
+		Training can become less sensitive to the initial values of weights.
+	\end{enumerate}
+	
+	\section{What Does BatchNorm Actually Normalize?}
+	
+	This is an important conceptual distinction.
+	
+	\begin{summarybox}
+		\[
+		\boxed{\text{BatchNorm normalizes activations, not weights.}}
+		\]
+		
+		For a layer
+		
+		\[
+		z=Wx+b,
+		\]
+		
+		BatchNorm operates on $z$ (or the corresponding layer activations),
+		rather than directly normalizing $W$.
+	\end{summarybox}
+	
+	This is different from techniques such as weight decay or $L_2$
+	regularization, which directly affect the magnitude of the weights.
+	
+	\section{Simple Numerical Example}
+	
+	Consider one feature whose activations in a mini-batch are
+	
+	\[
+	z=[2,\;4,\;6].
+	\]
+	
+	The batch mean is
+	
+	\begin{equation}
+		\mu=\frac{2+4+6}{3}=4.
+	\end{equation}
+	
+	The variance is
+	
+	\begin{equation}
+		\sigma^2
+		=
+		\frac{(2-4)^2+(4-4)^2+(6-4)^2}{3}
+		=
+		\frac{8}{3}.
+	\end{equation}
+	
+	Ignoring the very small $\epsilon$ for simplicity, the normalized values
+	are
+	
+	\begin{equation}
+		\hat{z}
+		=
+		\left[
+		\frac{-2}{\sqrt{8/3}},
+		\frac{0}{\sqrt{8/3}},
+		\frac{2}{\sqrt{8/3}}
+		\right].
+	\end{equation}
+	
+	Therefore, the values are centered around zero and have approximately
+	unit variance.
+	
+	If the learned parameters are, for example,
+	
+	\[
+	\gamma=2,
+	\qquad
+	\beta=1,
+	\]
+	
+	then
+	
+	\begin{equation}
+		y=2\hat{z}+1.
+	\end{equation}
+	
+	Thus, normalization is followed by a learned scale and shift.
+	
+	\section{BatchNorm: Four Steps to Remember}
+	
+	Students can remember BatchNorm using the following four-step sequence:
+	
+	\begin{enumerate}
+		\item \textbf{Mean} -- calculate the batch mean.
+		\item \textbf{Variance} -- calculate the batch variance.
+		\item \textbf{Normalize} -- obtain approximately zero mean and unit variance.
+		\item \textbf{Scale + Shift} -- use learnable $\gamma$ and $\beta$.
+	\end{enumerate}
+	
+	In compact form,
+	
+	\begin{equation}
+		\boxed{
+			\text{Mean}
+			\rightarrow
+			\text{Variance}
+			\rightarrow
+			\text{Normalize}
+			\rightarrow
+			\text{Scale + Shift}
+		}
+	\end{equation}
+	
+	\section{Key Points for Examination}
+	
+	\begin{itemize}[leftmargin=1.5em]
+		\item BatchNorm normalizes intermediate activations.
+		\item Mean and variance are calculated for each feature across a
+		mini-batch during training.
+		\item $\epsilon$ is added for numerical stability.
+		\item $\gamma$ and $\beta$ are learnable parameters.
+		\item $\gamma$ controls scale and $\beta$ controls shift.
+		\item During inference, running estimates of mean and variance are used.
+		\item BatchNorm can improve training stability and convergence.
+		\item BatchNorm is not the same as weight regularization.
+	\end{itemize}
+	
+	\section{One-Line Definition}
+	
+	\begin{tcolorbox}[
+		colback=lightblue,
+		colframe=titleblue,
+		boxrule=1pt,
+		arc=4pt
+		]
+		\centering
+		\large
+		\textbf{
+			Batch Normalization normalizes the intermediate activations of a
+			neural network using mini-batch statistics and then restores useful
+			scale and shift through learnable parameters $\gamma$ and $\beta$.
+		}
+	\end{tcolorbox}
+	
+\end{document}
