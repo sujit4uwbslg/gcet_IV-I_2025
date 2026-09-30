@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AdaGrad: Adaptive Learning Rate Visualization</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f4f8;
+            color: #1a2332;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 1300px;
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+            padding: 28px 32px 32px;
+            transition: all 0.2s;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 22px;
+            gap: 12px;
+        }
+
+        header h1 {
+            font-weight: 700;
+            font-size: 26px;
+            letter-spacing: -0.3px;
+            background: linear-gradient(135deg, #0b3b5c, #1f7a8c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        header h1 small {
+            font-weight: 400;
+            font-size: 15px;
+            -webkit-text-fill-color: #4a6a7f;
+            background: none;
+            margin-left: 8px;
+        }
+
+        .badge {
+            background: #e8f0fe;
+            color: #1a5a7a;
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-size: 13px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .badge span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #1f7a8c;
+            animation: pulse-dot 1.6s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.4;
+                transform: scale(0.7);
+            }
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 24px;
+            margin-bottom: 22px;
+        }
+
+        .plot-container {
+            background: #fafcff;
+            border-radius: 14px;
+            border: 1px solid #e6edf4;
+            padding: 12px;
+            position: relative;
+        }
+
+        .plot-container canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 1/1;
+            border-radius: 8px;
+            background: white;
+            cursor: crosshair;
+        }
+
+        .plot-label {
+            position: absolute;
+            bottom: 20px;
+            left: 24px;
+            font-size: 12px;
+            color: #4a6a7f;
+            background: rgba(255, 255, 255, 0.85);
+            padding: 3px 12px;
+            border-radius: 20px;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            pointer-events: none;
+        }
+
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .lr-plot-container {
+            background: #fafcff;
+            border-radius: 14px;
+            border: 1px solid #e6edf4;
+            padding: 12px;
+            flex: 1;
+            min-height: 200px;
+        }
+
+        .lr-plot-container canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 16/9;
+            border-radius: 6px;
+            background: white;
+        }
+
+        .info-panel {
+            background: #fafcff;
+            border-radius: 14px;
+            border: 1px solid #e6edf4;
+            padding: 16px 18px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px 18px;
+            font-size: 13px;
+        }
+
+        .info-panel .label {
+            color: #5a7a8f;
+            font-weight: 500;
+        }
+
+        .info-panel .value {
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            text-align: right;
+            color: #0b3b5c;
+        }
+
+        .info-panel .value.highlight {
+            color: #c44536;
+        }
+
+        .info-panel .value.highlight-blue {
+            color: #1f7a8c;
+        }
+
+        .info-panel .divider {
+            grid-column: 1 / -1;
+            border-top: 1px solid #e6edf4;
+            margin: 2px 0;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 18px 28px;
+            background: #f8faff;
+            border-radius: 14px;
+            border: 1px solid #e6edf4;
+            padding: 16px 22px;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .control-group label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #2a4a5f;
+            white-space: nowrap;
+        }
+
+        .control-group input[type="range"] {
+            width: 100px;
+            height: 4px;
+            -webkit-appearance: none;
+            background: #d0dce8;
+            border-radius: 4px;
+            outline: none;
+        }
+
+        .control-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #1f7a8c;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+        }
+
+        .control-group input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #1f7a8c;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+        }
+
+        .control-value {
+            min-width: 40px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #0b3b5c;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: #1f7a8c;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #156573;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(31, 122, 140, 0.3);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: #e6edf4;
+            color: #1a3a4a;
+        }
+
+        .btn-secondary:hover {
+            background: #d5e0ea;
+        }
+
+        .btn-danger {
+            background: #c44536;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #a83a2d;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        select {
+            padding: 6px 12px;
+            border-radius: 40px;
+            border: 1px solid #d0dce8;
+            background: white;
+            font-size: 13px;
+            font-weight: 500;
+            color: #1a2332;
+            outline: none;
+            cursor: pointer;
+        }
+
+        select:focus {
+            border-color: #1f7a8c;
+        }
+
+        .status-text {
+            font-size: 13px;
+            color: #4a6a7f;
+            margin-left: auto;
+            font-weight: 400;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-text .dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #6a8a9f;
+            transition: background 0.3s;
+        }
+
+        .status-text .dot.running {
+            background: #2e9c6e;
+            animation: pulse-dot 0.8s ease-in-out infinite;
+        }
+
+        .status-text .dot.done {
+            background: #1f7a8c;
+        }
+
+        @media (max-width: 920px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+            .right-panel {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 16px;
+            }
+            .lr-plot-container {
+                min-height: 160px;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 16px;
+            }
+            .right-panel {
+                grid-template-columns: 1fr;
+            }
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+            .control-group {
+                justify-content: space-between;
+            }
+            .control-group input[type="range"] {
+                width: 120px;
+                flex: 1;
+            }
+            .status-text {
+                margin-left: 0;
+                justify-content: center;
+            }
+            header h1 {
+                font-size: 20px;
+            }
+            header h1 small {
+                font-size: 13px;
+                display: block;
+                margin-left: 0;
+            }
+            .info-panel {
+                grid-template-columns: 1fr 1fr;
+                font-size: 12px;
+            }
+            .plot-container {
+                padding: 6px;
+            }
+        }
+
+        /* Tooltip style for canvas interaction */
+        .tooltip {
+            position: fixed;
+            background: rgba(10, 20, 30, 0.85);
+            color: #f0f8ff;
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 400;
+            pointer-events: none;
+            backdrop-filter: blur(6px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: none;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="app">
+        <header>
+            <h1>
+                ⚡ AdaGrad
+                <small>Adaptive Gradient Descent</small>
+            </h1>
+            <div class="badge">
+                <span></span> Dynamic Learning Rate
+            </div>
+        </header>
+
+        <div class="main-grid">
+            <!-- Left: Contour Plot -->
+            <div class="plot-container" id="contourContainer">
+                <canvas id="contourCanvas" width="600" height="600"></canvas>
+                <div class="plot-label">Click to set starting point</div>
+            </div>
+
+            <!-- Right Panel -->
+            <div class="right-panel">
+                <!-- Learning Rate Plot -->
+                <div class="lr-plot-container">
+                    <canvas id="lrCanvas" width="600" height="337"></canvas>
+                </div>
+
+                <!-- Info Panel -->
+                <div class="info-panel" id="infoPanel">
+                    <span class="label">Position</span>
+                    <span class="value" id="posDisplay">(0.00, 0.00)</span>
+                    <span class="label">Loss</span>
+                    <span class="value highlight" id="lossDisplay">0.0000</span>
+                    <span class="label">Gₓ (accumulated)</span>
+                    <span class="value highlight-blue" id="gxDisplay">0.0000</span>
+                    <span class="label">Gᵧ (accumulated)</span>
+                    <span class="value highlight-blue" id="gyDisplay">0.0000</span>
+                    <span class="label">ηₓ (lr for x)</span>
+                    <span class="value" id="lrXDisplay">0.0000</span>
+                    <span class="label">ηᵧ (lr for y)</span>
+                    <span class="value" id="lrYDisplay">0.0000</span>
+                    <span class="label">Step</span>
+                    <span class="value" id="stepDisplay">0 / 0</span>
+                    <div class="divider"></div>
+                    <span class="label" style="color:#5a7a8f;">Function</span>
+                    <span class="value" style="font-weight:400;font-size:12px;color:#4a6a7f;" id="funcDisplay">Elliptical</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <div class="control-group">
+                <label>η₀ (lr)</label>
+                <input type="range" id="lrSlider" min="0.01" max="2.0" step="0.01" value="0.5" />
+                <span class="control-value" id="lrValue">0.50</span>
+            </div>
+
+            <div class="control-group">
+                <label>ε (eps)</label>
+                <input type="range" id="epsSlider" min="1e-8" max="1e-3" step="1e-8" value="1e-7" />
+                <span class="control-value" id="epsValue">1e-7</span>
+            </div>
+
+            <div class="control-group">
+                <label>Speed</label>
+                <input type="range" id="speedSlider" min="1" max="30" step="1" value="8" />
+                <span class="control-value" id="speedValue">8</span>
+            </div>
+
+            <div class="control-group">
+                <label>Function</label>
+                <select id="funcSelect">
+                    <option value="elliptical">Elliptical</option>
+                    <option value="rosenbrock">Rosenbrock</option>
+                    <option value="saddle">Saddle</option>
+                    <option value="beale">Beale</option>
+                </select>
+            </div>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-primary" id="runBtn">▶ Run</button>
+                <button class="btn btn-secondary" id="resetBtn">⟳ Reset</button>
+            </div>
+
+            <div class="status-text">
+                <span class="dot" id="statusDot"></span>
+                <span id="statusLabel">Ready</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        // ============================================================
+        // 1. LOSS FUNCTIONS & GRADIENTS
+        // ============================================================
+
+        const FUNCTIONS = {
+            elliptical: {
+                label: 'Elliptical',
+                fn: (x, y) => 0.5 * (0.08 * x * x + 2.2 * y * y),
+                grad: (x, y) => [0.08 * x, 2.2 * y],
+                range: [-5.5, 5.5, -5.5, 5.5],
+                levels: [0.5, 1, 2, 4, 8, 16, 32],
+                start: [4.5, 3.5],
+                desc: 'f(x,y) = ½(0.08x² + 2.2y²)'
+            },
+            rosenbrock: {
+                label: 'Rosenbrock',
+                fn: (x, y) => (1 - x) ** 2 + 50 * (y - x * x) ** 2,
+                grad: (x, y) => {
+                    const gx = -2 * (1 - x) - 200 * x * (y - x * x);
+                    const gy = 100 * (y - x * x);
+                    return [gx, gy];
+                },
+                range: [-2.2, 3.2, -1.2, 4.2],
+                levels: [0.5, 2, 5, 10, 20, 50, 100, 200],
+                start: [-1.2, 3.0],
+                desc: 'f(x,y) = (1-x)² + 50(y-x²)²'
+            },
+            saddle: {
+                label: 'Saddle',
+                fn: (x, y) => 0.5 * (x * x - y * y) + 0.3 * x * y,
+                grad: (x, y) => [x + 0.3 * y, -y + 0.3 * x],
+                range: [-4.0, 4.0, -4.0, 4.0],
+                levels: [-10, -5, -2, -1, 0.5, 1, 2, 5, 10],
+                start: [3.0, 2.5],
+                desc: 'f(x,y) = ½(x² − y²) + 0.3xy'
+            },
+            beale: {
+                label: 'Beale',
+                fn: (x, y) => (1.5 - x + x * y) ** 2 + (2.25 - x + x * y * y) ** 2 + (2.625 - x + x * y * y * y) ** 2,
+                grad: (x, y) => {
+                    const a = 1.5 - x + x * y;
+                    const b = 2.25 - x + x * y * y;
+                    const c = 2.625 - x + x * y * y * y;
+                    const gx = 2 * a * (-1 + y) + 2 * b * (-1 + y * y) + 2 * c * (-1 + y * y * y);
+                    const gy = 2 * a * x + 4 * b * x * y + 6 * c * x * y * y;
+                    return [gx, gy];
+                },
+                range: [-4.0, 4.0, -4.0, 4.0],
+                levels: [0.5, 2, 5, 10, 20, 50, 100, 200, 500],
+                start: [3.0, 3.0],
+                desc: 'Beale function'
+            }
+        };
+
+        // ============================================================
+        // 2. STATE
+        // ============================================================
+
+        const state = {
+            funcKey: 'elliptical',
+            lr: 0.5,
+            eps: 1e-7,
+            speed: 8,
+            x: 4.5,
+            y: 3.5,
+            Gx: 0,
+            Gy: 0,
+            steps: 0,
+            maxSteps: 120,
+            isRunning: false,
+            isDone: false,
+            history: [], // [{x, y, lrX, lrY, Gx, Gy, loss, step}]
+            animationId: null,
+            // for smooth rendering
+            renderPending: false,
+        };
+
+        // ============================================================
+        // 3. DOM REFS
+        // ============================================================
+
+        const contourCanvas = document.getElementById('contourCanvas');
+        const ctx = contourCanvas.getContext('2d');
+        const lrCanvas = document.getElementById('lrCanvas');
+        const lrCtx = lrCanvas.getContext('2d');
+
+        const lrSlider = document.getElementById('lrSlider');
+        const lrValue = document.getElementById('lrValue');
+        const epsSlider = document.getElementById('epsSlider');
+        const epsValue = document.getElementById('epsValue');
+        const speedSlider = document.getElementById('speedSlider');
+        const speedValue = document.getElementById('speedValue');
+        const funcSelect = document.getElementById('funcSelect');
+        const runBtn = document.getElementById('runBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const statusDot = document.getElementById('statusDot');
+        const statusLabel = document.getElementById('statusLabel');
+
+        const posDisplay = document.getElementById('posDisplay');
+        const lossDisplay = document.getElementById('lossDisplay');
+        const gxDisplay = document.getElementById('gxDisplay');
+        const gyDisplay = document.getElementById('gyDisplay');
+        const lrXDisplay = document.getElementById('lrXDisplay');
+        const lrYDisplay = document.getElementById('lrYDisplay');
+        const stepDisplay = document.getElementById('stepDisplay');
+        const funcDisplay = document.getElementById('funcDisplay');
+
+        const tooltip = document.getElementById('tooltip');
+
+        // ============================================================
+        // 4. HELPER FUNCTIONS
+        // ============================================================
+
+        function getFunc() {
+            return FUNCTIONS[state.funcKey];
+        }
+
+        function getFuncState() {
+            const f = getFunc();
+            return {
+                fn: f.fn,
+                grad: f.grad,
+                range: f.range,
+                levels: f.levels,
+                label: f.label,
+                desc: f.desc
+            };
+        }
+
+        function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+        function lerp(a, b, t) { return a + (b - a) * t; }
+
+        // ============================================================
+        // 5. ADAGRAD UPDATE
+        // ============================================================
+
+        function adagradStep(x, y, Gx, Gy, lr, eps, gradFn) {
+            const [gx, gy] = gradFn(x, y);
+            const newGx = Gx + gx * gx;
+            const newGy = Gy + gy * gy;
+            const lrX = lr / (Math.sqrt(newGx) + eps);
+            const lrY = lr / (Math.sqrt(newGy) + eps);
+            const newX = x - lrX * gx;
+            const newY = y - lrY * gy;
+            return { x: newX, y: newY, Gx: newGx, Gy: newGy, lrX, lrY, gx, gy };
+        }
+
+        // ============================================================
+        // 6. RUN OPTIMIZATION
+        // ============================================================
+
+        function runOptimization(steps, startX, startY, lr, eps, funcKey) {
+            const f = FUNCTIONS[funcKey];
+            const { fn, grad, range } = f;
+            const [xMin, xMax, yMin, yMax] = range;
+
+            let x = clamp(startX, xMin, xMax);
+            let y = clamp(startY, yMin, yMax);
+            let Gx = 0,
+                Gy = 0;
+            const history = [];
+
+            for (let i = 0; i < steps; i++) {
+                const loss = fn(x, y);
+                const result = adagradStep(x, y, Gx, Gy, lr, eps, grad);
+                history.push({
+                    x,
+                    y,
+                    loss,
+                    Gx,
+                    Gy,
+                    lrX: result.lrX,
+                    lrY: result.lrY,
+                    step: i,
+                    gx: result.gx,
+                    gy: result.gy,
+                });
+                x = result.x;
+                y = result.y;
+                Gx = result.Gx;
+                Gy = result.Gy;
+                // clamp
+                x = clamp(x, xMin, xMax);
+                y = clamp(y, yMin, yMax);
+                // Early stop if loss is tiny
+                if (Math.abs(loss) < 1e-14 && Math.abs(fn(x, y)) < 1e-14) break;
+            }
+            // final state
+            const finalLoss = fn(x, y);
+            history.push({
+                x,
+                y,
+                loss: finalLoss,
+                Gx,
+                Gy,
+                lrX: lr / (Math.sqrt(Gx) + eps),
+                lrY: lr / (Math.sqrt(Gy) + eps),
+                step: history.length,
+                gx: 0,
+                gy: 0,
+                isFinal: true
+            });
+
+            return history;
+        }
+
+        // ============================================================
+        // 7. DRAWING: CONTOUR PLOT
+        // ============================================================
+
+        function drawContour(history, highlightIdx) {
+            const canvas = contourCanvas;
+            const W = canvas.width,
+                H = canvas.height;
+            const rect = canvas.getBoundingClientRect();
+            const dpr = 1; // We use fixed canvas size
+
+            const f = getFunc();
+            const { fn, range, levels } = f;
+            const [xMin, xMax, yMin, yMax] = range;
+
+            ctx.clearRect(0, 0, W, H);
+
+            // --- Heatmap ---
+            const gridRes = 120;
+            const cellW = W / gridRes;
+            const cellH = H / gridRes;
+
+            // Find min/max loss for color scaling
+            let minLoss = Infinity,
+                maxLoss = -Infinity;
+            const lossGrid = [];
+            for (let i = 0; i < gridRes; i++) {
+                const row = [];
+                for (let j = 0; j < gridRes; j++) {
+                    const x = xMin + (i / gridRes) * (xMax - xMin);
+                    const y = yMin + (j / gridRes) * (yMax - yMin);
+                    const l = fn(x, y);
+                    row.push(l);
+                    if (l < minLoss) minLoss = l;
+                    if (l > maxLoss) maxLoss = l;
+                }
+                lossGrid.push(row);
+            }
+            const rangeLoss = maxLoss - minLoss || 1;
+
+            // Color function: blue -> white -> red
+            function lossColor(l) {
+                const t = (l - minLoss) / rangeLoss; // 0..1
+                const r = Math.min(1, Math.max(0, (t - 0.4) * 2.5));
+                const b = Math.min(1, Math.max(0, (0.6 - t) * 2.5));
+                const g = Math.min(1, Math.max(0, 1 - Math.abs(t - 0.5) * 2));
+                return [r * 255, g * 255, b * 255];
+            }
+
+            for (let i = 0; i < gridRes; i++) {
+                for (let j = 0; j < gridRes; j++) {
+                    const l = lossGrid[i][j];
+                    const [r, g, b] = lossColor(l);
+                    ctx.fillStyle = `rgb(${r|0},${g|0},${b|0})`;
+                    ctx.fillRect(i * cellW, (gridRes - 1 - j) * cellH, cellW + 0.5, cellH + 0.5);
+                }
+            }
+
+            // --- Contour lines ---
+            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+            ctx.lineWidth = 0.8;
+
+            for (const level of levels) {
+                ctx.beginPath();
+                let started = false;
+                for (let i = 0; i < gridRes - 1; i++) {
+                    for (let j = 0; j < gridRes - 1; j++) {
+                        const corners = [
+                            lossGrid[i][j],
+                            lossGrid[i + 1][j],
+                            lossGrid[i + 1][j + 1],
+                            lossGrid[i][j + 1]
+                        ];
+                        let below = 0,
+                            above = 0;
+                        for (let k = 0; k < 4; k++) {
+                            if (corners[k] < level) below++;
+                            else above++;
+                        }
+                        if (below === 0 || above === 0) continue;
+                        // Simple linear interpolation for contour crossing
+                        const pts = [];
+                        for (let k = 0; k < 4; k++) {
+                            const k1 = (k + 1) % 4;
+                            const v0 = corners[k],
+                                v1 = corners[k1];
+                            if ((v0 < level && v1 >= level) || (v0 >= level && v1 < level)) {
+                                const t = (level - v0) / (v1 - v0);
+                                const xi = i + (k === 0 || k === 3 ? 0 : 1);
+                                const yi = j + (k === 0 || k === 1 ? 0 : 1);
+                                const px = xi + (k === 1 || k === 2 ? t : 1 - t);
+                                const py = yi + (k === 2 || k === 3 ? t : 1 - t);
+                                pts.push([px, py]);
+                            }
+                        }
+                        if (pts.length >= 2) {
+                            const x1 = pts[0][0] * cellW;
+                            const y1 = (gridRes - 1 - pts[0][1]) * cellH;
+                            const x2 = pts[1][0] * cellW;
+                            const y2 = (gridRes - 1 - pts[1][1]) * cellH;
+                            ctx.moveTo(x1, y1);
+                            ctx.lineTo(x2, y2);
+                            started = true;
+                        }
+                    }
+                }
+                ctx.stroke();
+            }
+
+            // --- Axis labels ---
+            ctx.fillStyle = 'rgba(20,40,60,0.7)';
+            ctx.font = '11px "Segoe UI", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            for (let v = -4; v <= 4; v += 2) {
+                const px = ((v - xMin) / (xMax - xMin)) * W;
+                if (px > 10 && px < W - 10) {
+                    ctx.fillText(v.toFixed(0), px, H - 18);
+                }
+            }
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            for (let v = -4; v <= 4; v += 2) {
+                const py = H - ((v - yMin) / (yMax - yMin)) * H;
+                if (py > 10 && py < H - 10) {
+                    ctx.fillText(v.toFixed(0), 16, py);
+                }
+            }
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillStyle = 'rgba(20,40,60,0.5)';
+            ctx.font = '10px "Segoe UI", sans-serif';
+            ctx.fillText('x', W - 14, H - 18);
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('y', 14, 12);
+
+            // --- Optimization path ---
+            if (history && history.length > 0) {
+                // Draw path line
+                ctx.beginPath();
+                ctx.strokeStyle = '#c44536';
+                ctx.lineWidth = 2.5;
+                ctx.shadowColor = 'rgba(0,0,0,0.15)';
+                ctx.shadowBlur = 4;
+                for (let i = 0; i < history.length; i++) {
+                    const h = history[i];
+                    const px = ((h.x - xMin) / (xMax - xMin)) * W;
+                    const py = H - ((h.y - yMin) / (yMax - yMin)) * H;
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+
+                // Draw points
+                for (let i = 0; i < history.length; i++) {
+                    const h = history[i];
+                    const px = ((h.x - xMin) / (xMax - xMin)) * W;
+                    const py = H - ((h.y - yMin) / (yMax - yMin)) * H;
+                    const isHighlight = (highlightIdx !== undefined && i === highlightIdx);
+                    const isLast = (i === history.length - 1);
+                    const radius = isHighlight ? 7 : (isLast ? 6 : 3);
+                    ctx.beginPath();
+                    ctx.arc(px, py, radius, 0, Math.PI * 2);
+                    if (isHighlight || isLast) {
+                        ctx.fillStyle = isHighlight ? '#ff6b4a' : '#c44536';
+                        ctx.shadowColor = 'rgba(0,0,0,0.2)';
+                        ctx.shadowBlur = 8;
+                    } else {
+                        ctx.fillStyle = 'rgba(196,69,54,0.6)';
+                        ctx.shadowBlur = 0;
+                    }
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                    if (isHighlight || isLast) {
+                        ctx.strokeStyle = 'white';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    }
+                }
+
+                // Final point glow
+                if (history.length > 0) {
+                    const last = history[history.length - 1];
+                    const px = ((last.x - xMin) / (xMax - xMin)) * W;
+                    const py = H - ((last.y - yMin) / (yMax - yMin)) * H;
+                    const grad = ctx.createRadialGradient(px, py, 2, px, py, 22);
+                    grad.addColorStop(0, 'rgba(196,69,54,0.25)');
+                    grad.addColorStop(1, 'rgba(196,69,54,0)');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(px, py, 22, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // --- Current position marker (if not running and history exists) ---
+            if (history && history.length > 0 && !state.isRunning) {
+                const last = history[history.length - 1];
+                const px = ((last.x - xMin) / (xMax - xMin)) * W;
+                const py = H - ((last.y - yMin) / (yMax - yMin)) * H;
+                ctx.beginPath();
+                ctx.arc(px, py, 8, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(196,69,54,0.15)';
+                ctx.fill();
+                ctx.strokeStyle = '#c44536';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            // --- Legend: show function description ---
+            ctx.fillStyle = 'rgba(10,30,50,0.7)';
+            ctx.font = '11px "Segoe UI", sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'bottom';
+            const desc = getFunc().desc || '';
+            ctx.fillText(desc, 14, H - 4);
+        }
+
+        // ============================================================
+        // 8. DRAWING: LEARNING RATE PLOT
+        // ============================================================
+
+        function drawLRPlot(history) {
+            const canvas = lrCanvas;
+            const W = canvas.width,
+                H = canvas.height;
+            const ctx = lrCtx;
+            ctx.clearRect(0, 0, W, H);
+
+            // Background
+            ctx.fillStyle = '#fafcff';
+            ctx.fillRect(0, 0, W, H);
+
+            const pad = { top: 16, bottom: 22, left: 28, right: 16 };
+            const plotW = W - pad.left - pad.right;
+            const plotH = H - pad.top - pad.bottom;
+
+            if (!history || history.length < 2) {
+                ctx.fillStyle = '#8a9aaf';
+                ctx.font = '13px "Segoe UI", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('Run optimization to see learning rates', W / 2, H / 2);
+                return;
+            }
+
+            // Filter out the final step if it's a duplicate
+            const data = history.filter((h, i) => !h.isFinal || i === history.length - 1);
+            const steps = data.length;
+
+            // Find max lr for scaling
+            let maxLr = 0;
+            for (const d of data) {
+                if (d.lrX > maxLr) maxLr = d.lrX;
+                if (d.lrY > maxLr) maxLr = d.lrY;
+            }
+            maxLr = Math.max(maxLr, 0.001);
+            const yMax = maxLr * 1.25;
+
+            // Draw grid
+            ctx.strokeStyle = '#e6edf4';
+            ctx.lineWidth = 0.5;
+            for (let i = 0; i <= 4; i++) {
+                const y = pad.top + plotH - (i / 4) * plotH;
+                ctx.beginPath();
+                ctx.moveTo(pad.left, y);
+                ctx.lineTo(pad.left + plotW, y);
+                ctx.stroke();
+                const val = (i / 4) * yMax;
+                ctx.fillStyle = '#6a8a9f';
+                ctx.font = '9px "Segoe UI", sans-serif';
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(val.toFixed(3), pad.left - 6, y);
+            }
+
+            // X axis labels
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillStyle = '#6a8a9f';
+            ctx.font = '9px "Segoe UI", sans-serif';
+            const stepLabels = [0, Math.floor(steps / 4), Math.floor(steps / 2), Math.floor(3 * steps / 4), steps - 1];
+            for (const idx of stepLabels) {
+                if (idx < steps) {
+                    const x = pad.left + (idx / (steps - 1)) * plotW;
+                    ctx.fillText(idx, x, pad.top + plotH + 4);
+                }
+            }
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillStyle = '#4a6a7f';
+            ctx.font = '9px "Segoe UI", sans-serif';
+            ctx.fillText('Step', pad.left + plotW - 30, pad.top + plotH + 4);
+
+            // Y label
+            ctx.save();
+            ctx.translate(14, pad.top + plotH / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#4a6a7f';
+            ctx.font = '9px "Segoe UI", sans-serif';
+            ctx.fillText('Learning Rate', 0, 0);
+            ctx.restore();
+
+            // Draw lr_x (blue)
+            ctx.beginPath();
+            ctx.strokeStyle = '#1f7a8c';
+            ctx.lineWidth = 2.5;
+            for (let i = 0; i < steps; i++) {
+                const d = data[i];
+                const x = pad.left + (i / (steps - 1)) * plotW;
+                const y = pad.top + plotH - (d.lrX / yMax) * plotH;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+
+            // Draw lr_y (orange)
+            ctx.beginPath();
+            ctx.strokeStyle = '#c44536';
+            ctx.lineWidth = 2.5;
+            for (let i = 0; i < steps; i++) {
+                const d = data[i];
+                const x = pad.left + (i / (steps - 1)) * plotW;
+                const y = pad.top + plotH - (d.lrY / yMax) * plotH;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+
+            // Legend
+            const legX = pad.left + plotW - 120;
+            const legY = pad.top + 8;
+            ctx.fillStyle = '#1f7a8c';
+            ctx.fillRect(legX, legY + 2, 14, 3);
+            ctx.fillStyle = '#1f7a8c';
+            ctx.font = '10px "Segoe UI", sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('ηₓ', legX + 18, legY + 3);
+
+            ctx.fillStyle = '#c44536';
+            ctx.fillRect(legX + 52, legY + 2, 14, 3);
+            ctx.fillStyle = '#c44536';
+            ctx.fillText('ηᵧ', legX + 70, legY + 3);
+
+            // Highlight current step
+            if (state.steps > 0 && state.steps < steps) {
+                const idx = Math.min(state.steps, steps - 1);
+                const x = pad.left + (idx / (steps - 1)) * plotW;
+                ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([3, 4]);
+                ctx.beginPath();
+                ctx.moveTo(x, pad.top);
+                ctx.lineTo(x, pad.top + plotH);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+
+        // ============================================================
+        // 9. UPDATE INFO PANEL
+        // ============================================================
+
+        function updateInfo(history, stepIdx) {
+            if (!history || history.length === 0) {
+                posDisplay.textContent = '( — , — )';
+                lossDisplay.textContent = '—';
+                gxDisplay.textContent = '—';
+                gyDisplay.textContent = '—';
+                lrXDisplay.textContent = '—';
+                lrYDisplay.textContent = '—';
+                stepDisplay.textContent = '0 / 0';
+                return;
+            }
+            const idx = stepIdx !== undefined ? Math.min(stepIdx, history.length - 1) : history.length - 1;
+            const d = history[idx];
+            const total = history.length - 1;
+            posDisplay.textContent = `(${d.x.toFixed(3)}, ${d.y.toFixed(3)})`;
+            lossDisplay.textContent = d.loss.toFixed(5);
+            gxDisplay.textContent = d.Gx.toFixed(4);
+            gyDisplay.textContent = d.Gy.toFixed(4);
+            lrXDisplay.textContent = d.lrX.toFixed(5);
+            lrYDisplay.textContent = d.lrY.toFixed(5);
+            stepDisplay.textContent = `${d.step} / ${total}`;
+            funcDisplay.textContent = getFunc().label;
+        }
+
+        // ============================================================
+        // 10. MAIN RENDER
+        // ============================================================
+
+        function render(highlightIdx) {
+            const history = state.history;
+            const step = state.steps;
+
+            // Determine which step to highlight
+            let idx = highlightIdx;
+            if (idx === undefined && history && history.length > 0) {
+                idx = Math.min(step, history.length - 1);
+                if (state.isRunning && state.steps < history.length) {
+                    idx = state.steps;
+                }
+            }
+
+            drawContour(history, idx);
+            drawLRPlot(history);
+            updateInfo(history, idx);
+
+            // Update status
+            if (state.isRunning) {
+                statusDot.className = 'dot running';
+                statusLabel.textContent = `Running... ${state.steps}/${state.maxSteps}`;
+            } else if (state.isDone) {
+                statusDot.className = 'dot done';
+                statusLabel.textContent = `Done ✓ (${state.history ? state.history.length-1 : 0} steps)`;
+            } else {
+                statusDot.className = 'dot';
+                statusLabel.textContent = 'Ready';
+            }
+        }
+
+        // ============================================================
+        // 11. CONTROLS & EVENT HANDLERS
+        // ============================================================
+
+        function resetOptimization() {
+            if (state.animationId) {
+                cancelAnimationFrame(state.animationId);
+                state.animationId = null;
+            }
+            state.isRunning = false;
+            state.isDone = false;
+            state.steps = 0;
+
+            const f = getFunc();
+            const range = f.range;
+            const start = f.start || [(range[0] + range[1]) / 2, (range[2] + range[3]) / 2];
+            state.x = start[0];
+            state.y = start[1];
+            state.Gx = 0;
+            state.Gy = 0;
+            state.history = [];
+            state.renderPending = false;
+
+            runBtn.textContent = '▶ Run';
+            render();
+        }
+
+        function startOptimization() {
+            if (state.isRunning) {
+                // Pause
+                state.isRunning = false;
+                if (state.animationId) {
+                    cancelAnimationFrame(state.animationId);
+                    state.animationId = null;
+                }
+                runBtn.textContent = '▶ Resume';
+                statusLabel.textContent = 'Paused';
+                statusDot.className = 'dot';
+                return;
+            }
+
+            if (state.isDone) {
+                resetOptimization();
+                // then start again
+                setTimeout(() => startOptimization(), 50);
+                return;
+            }
+
+            // If we have no history, run the full optimization first
+            if (!state.history || state.history.length === 0) {
+                const f = getFunc();
+                const range = f.range;
+                const start = f.start || [(range[0] + range[1]) / 2, (range[2] + range[3]) / 2];
+                const lr = parseFloat(lrSlider.value);
+                const eps = parseFloat(epsSlider.value);
+                state.history = runOptimization(state.maxSteps, start[0], start[1], lr, eps, state.funcKey);
+                state.steps = 0;
+                state.x = state.history[0].x;
+                state.y = state.history[0].y;
+                state.Gx = state.history[0].Gx;
+                state.Gy = state.history[0].Gy;
+                // Update state with final values
+                const last = state.history[state.history.length - 1];
+                state.x = last.x;
+                state.y = last.y;
+                state.Gx = last.Gx;
+                state.Gy = last.Gy;
+                state.isDone = false;
+            }
+
+            state.isRunning = true;
+            state.isDone = false;
+            runBtn.textContent = '⏸ Pause';
+            statusDot.className = 'dot running';
+            statusLabel.textContent = 'Running...';
+
+            // Animate
+            let frameId = null;
+            let lastTime = 0;
+            const speed = parseInt(speedSlider.value);
+            const delay = Math.max(10, 80 - speed * 2.5);
+
+            function animate(time) {
+                if (!state.isRunning) {
+                    state.animationId = null;
+                    return;
+                }
+                if (lastTime === 0) lastTime = time;
+                if (time - lastTime >= delay) {
+                    lastTime = time;
+                    if (state.steps < state.history.length - 1) {
+                        state.steps++;
+                        render();
+                    } else {
+                        state.isRunning = false;
+                        state.isDone = true;
+                        runBtn.textContent = '▶ Run';
+                        statusDot.className = 'dot done';
+                        statusLabel.textContent = `Done ✓ (${state.history.length-1} steps)`;
+                        state.animationId = null;
+                        return;
+                    }
+                }
+                frameId = requestAnimationFrame(animate);
+            }
+
+            state.animationId = requestAnimationFrame(animate);
+        }
+
+        // --- Slider events ---
+        lrSlider.addEventListener('input', () => {
+            const val = parseFloat(lrSlider.value);
+            lrValue.textContent = val.toFixed(2);
+            state.lr = val;
+            if (!state.isRunning && !state.isDone) {
+                // update parameters for future runs
+            }
+        });
+
+        epsSlider.addEventListener('input', () => {
+            const val = parseFloat(epsSlider.value);
+            epsValue.textContent = val.toExponential(0);
+            state.eps = val;
+        });
+
+        speedSlider.addEventListener('input', () => {
+            const val = parseInt(speedSlider.value);
+            speedValue.textContent = val;
+            state.speed = val;
+        });
+
+        // --- Function selector ---
+        funcSelect.addEventListener('change', () => {
+            const key = funcSelect.value;
+            state.funcKey = key;
+            const f = getFunc();
+            const range = f.range;
+            const start = f.start || [(range[0] + range[1]) / 2, (range[2] + range[3]) / 2];
+            state.x = start[0];
+            state.y = start[1];
+            state.Gx = 0;
+            state.Gy = 0;
+            state.history = [];
+            state.steps = 0;
+            state.isRunning = false;
+            state.isDone = false;
+            if (state.animationId) {
+                cancelAnimationFrame(state.animationId);
+                state.animationId = null;
+            }
+            runBtn.textContent = '▶ Run';
+            statusDot.className = 'dot';
+            statusLabel.textContent = 'Ready';
+            render();
+        });
+
+        // --- Buttons ---
+        runBtn.addEventListener('click', startOptimization);
+
+        resetBtn.addEventListener('click', () => {
+            if (state.animationId) {
+                cancelAnimationFrame(state.animationId);
+                state.animationId = null;
+            }
+            const f = getFunc();
+            const range = f.range;
+            const start = f.start || [(range[0] + range[1]) / 2, (range[2] + range[3]) / 2];
+            state.x = start[0];
+            state.y = start[1];
+            state.Gx = 0;
+            state.Gy = 0;
+            state.history = [];
+            state.steps = 0;
+            state.isRunning = false;
+            state.isDone = false;
+            runBtn.textContent = '▶ Run';
+            statusDot.className = 'dot';
+            statusLabel.textContent = 'Ready';
+            render();
+        });
+
+        // --- Click on contour to set starting point ---
+        contourCanvas.addEventListener('click', (e) => {
+            if (state.isRunning) return;
+            const rect = contourCanvas.getBoundingClientRect();
+            const scaleX = contourCanvas.width / rect.width;
+            const scaleY = contourCanvas.height / rect.height;
+            const mx = (e.clientX - rect.left) * scaleX;
+            const my = (e.clientY - rect.top) * scaleY;
+
+            const f = getFunc();
+            const range = f.range;
+            const [xMin, xMax, yMin, yMax] = range;
+
+            const x = xMin + (mx / contourCanvas.width) * (xMax - xMin);
+            const y = yMin + (1 - my / contourCanvas.height) * (yMax - yMin);
+
+            state.x = clamp(x, xMin, xMax);
+            state.y = clamp(y, yMin, yMax);
+            state.Gx = 0;
+            state.Gy = 0;
+            state.history = [];
+            state.steps = 0;
+            state.isDone = false;
+            if (state.animationId) {
+                cancelAnimationFrame(state.animationId);
+                state.animationId = null;
+            }
+            state.isRunning = false;
+            runBtn.textContent = '▶ Run';
+            statusDot.className = 'dot';
+            statusLabel.textContent = 'Ready';
+            render();
+        });
+
+        // --- Mouse move for tooltip on contour ---
+        contourCanvas.addEventListener('mousemove', (e) => {
+            const rect = contourCanvas.getBoundingClientRect();
+            const scaleX = contourCanvas.width / rect.width;
+            const scaleY = contourCanvas.height / rect.height;
+            const mx = (e.clientX - rect.left) * scaleX;
+            const my = (e.clientY - rect.top) * scaleY;
+
+            const f = getFunc();
+            const range = f.range;
+            const [xMin, xMax, yMin, yMax] = range;
+
+            const x = xMin + (mx / contourCanvas.width) * (xMax - xMin);
+            const y = yMin + (1 - my / contourCanvas.height) * (yMax - yMin);
+            const loss = f.fn(x, y);
+
+            tooltip.style.display = 'block';
+            tooltip.style.left = (e.clientX + 14) + 'px';
+            tooltip.style.top = (e.clientY - 10) + 'px';
+            tooltip.textContent = `f(${x.toFixed(2)}, ${y.toFixed(2)}) = ${loss.toFixed(3)}`;
+        });
+
+        contourCanvas.addEventListener('mouseleave', () => {
+            tooltip.style.display = 'none';
+        });
+
+        // ============================================================
+        // 12. INITIALIZATION
+        // ============================================================
+
+        function init() {
+            // Set initial values from sliders
+            state.lr = parseFloat(lrSlider.value);
+            state.eps = parseFloat(epsSlider.value);
+            state.speed = parseInt(speedSlider.value);
+            lrValue.textContent = state.lr.toFixed(2);
+            epsValue.textContent = state.eps.toExponential(0);
+            speedValue.textContent = state.speed;
+
+            const f = getFunc();
+            const range = f.range;
+            const start = f.start || [(range[0] + range[1]) / 2, (range[2] + range[3]) / 2];
+            state.x = start[0];
+            state.y = start[1];
+            state.history = [];
+            state.steps = 0;
+
+            render();
+        }
+
+        // Handle resize - debounced
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                if (!state.isRunning) render();
+            }, 150);
+        });
+
+        // Also re-render when DPR changes or canvas needs refresh
+        // For high DPI, we keep canvas at fixed size for crisp rendering
+
+        init();
+
+        console.log('🚀 AdaGrad Visualization loaded.');
+        console.log('📐 Functions: elliptical, rosenbrock, saddle, beale');
+        console.log('💡 Click on the contour plot to set starting point.');
+        console.log('⚡ Adjust learning rate, epsilon, and speed with sliders.');
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Momentum in a Valley</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            background-color: #1e1e24;
+            color: #fff;
+        }
+        #sidebar {
+            width: 320px;
+            padding: 30px;
+            background: #2b2b36;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            z-index: 10;
+        }
+        h2 {
+            margin: 0 0 10px 0;
+            font-size: 1.4rem;
+            color: #61dafb;
+        }
+        p.desc {
+            font-size: 0.9rem;
+            color: #a0a0b0;
+            margin: 0;
+            line-height: 1.5;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        .val-display {
+            color: #61dafb;
+            font-family: monospace;
+        }
+        input[type=range] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: #61dafb;
+        }
+        button {
+            padding: 12px;
+            background-color: #61dafb;
+            color: #1e1e24;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: #4fa8c7;
+        }
+        #canvas-container {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <div>
+            <h2>The Rolling Ball</h2>
+            <p class="desc">This simulation uses the exact Classical Momentum update rule: <br><br><code>v = β * v - α * ∇f(x)</code><br><code>x = x + v</code></p>
+        </div>
+
+        <div class="control-group">
+            <div class="control-header">
+                <label for="alpha">Gravity / Learning Rate (α)</label>
+                <span class="val-display" id="alpha-val">0.05</span>
+            </div>
+            <input type="range" id="alpha" min="0.01" max="0.1" step="0.001" value="0.05">
+        </div>
+
+        <div class="control-group">
+            <div class="control-header">
+                <label for="beta">Momentum / Friction (β)</label>
+                <span class="val-display" id="beta-val">0.98</span>
+            </div>
+            <input type="range" id="beta" min="0.80" max="1.00" step="0.005" value="0.98">
+            <p class="desc" style="font-size: 0.75rem;">(1.0 = frictionless, bounces forever. Lower = more damping).</p>
+        </div>
+
+        <button id="reset-btn">Drop Ball</button>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="simCanvas"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvas-container');
+
+        // Physics/Optimizer state
+        let x = -8; // starting x position
+        let v = 0;  // starting velocity
+        let alpha = 0.05; // learning rate (gravity impact)
+        let beta = 0.98;  // momentum (friction)
+        let trail = [];   // to show speed
+
+        // Function landscape: f(x) = x^2
+        function f(x) { return x * x; }
+        // Gradient: f'(x) = 2x
+        function grad_f(x) { return 2 * x; }
+
+        function resizeCanvas() {
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+
+        // Map math coordinates to screen coordinates
+        function toScreen(mathX, mathY) {
+            const scaleX = canvas.width / 24;  // visible range -12 to 12
+            const scaleY = canvas.height / 150; // visible height 0 to 150
+            const screenX = (mathX + 12) * scaleX;
+            // Invert Y so positive math Y goes up from the bottom
+            const screenY = canvas.height - (mathY * scaleY) - 50; 
+            return { x: screenX, y: screenY };
+        }
+
+        function drawValley() {
+            ctx.beginPath();
+            ctx.strokeStyle = '#a0a0b0';
+            ctx.lineWidth = 3;
+            for (let mx = -12; mx <= 12; mx += 0.1) {
+                let my = f(mx);
+                let pt = toScreen(mx, my);
+                if (mx === -12) ctx.moveTo(pt.x, pt.y);
+                else ctx.lineTo(pt.x, pt.y);
+            }
+            ctx.stroke();
+
+            // Draw target line at bottom
+            let target = toScreen(0, 0);
+            ctx.beginPath();
+            ctx.strokeStyle = '#ff4b4b';
+            ctx.setLineDash([5, 5]);
+            ctx.moveTo(target.x, target.y + 20);
+            ctx.lineTo(target.x, target.y - 400);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        function drawTrail() {
+            ctx.fillStyle = 'rgba(97, 218, 251, 0.4)';
+            for (let i = 0; i < trail.length; i++) {
+                let pt = toScreen(trail[i].x, trail[i].y);
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function drawBall(mathX, mathY) {
+            let pt = toScreen(mathX, mathY);
+            ctx.beginPath();
+            ctx.fillStyle = '#61dafb';
+            ctx.arc(pt.x, pt.y - 15, 15, 0, Math.PI * 2); // Offset slightly so it rests on the line
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        function updatePhysics() {
+            // Only update trail every few frames to show discrete steps clearly
+            if (trail.length === 0 || Math.abs(trail[trail.length - 1].x - x) > 0.1) {
+                trail.push({ x: x, y: f(x) });
+                if (trail.length > 60) trail.shift();
+            }
+
+            // The Momentum Update Rule
+            let gradient = grad_f(x);
+            v = beta * v - alpha * gradient;
+            x = x + v;
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            drawValley();
+            drawTrail();
+            drawBall(x, f(x));
+            updatePhysics();
+
+            requestAnimationFrame(animate);
+        }
+
+        // UI Listeners
+        document.getElementById('alpha').addEventListener('input', (e) => {
+            alpha = parseFloat(e.target.value);
+            document.getElementById('alpha-val').innerText = alpha.toFixed(3);
+        });
+
+        document.getElementById('beta').addEventListener('input', (e) => {
+            beta = parseFloat(e.target.value);
+            document.getElementById('beta-val').innerText = beta.toFixed(3);
+        });
+
+        document.getElementById('reset-btn').addEventListener('click', () => {
+            x = -10; // Drop from higher up on reset
+            v = 0;
+            trail = [];
+        });
+
+        // Init
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        animate();
+    </script>
+</body>
+</html>

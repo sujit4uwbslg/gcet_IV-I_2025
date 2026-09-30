@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NAG vs Momentum Interactive Visualizer</title>
+    <!-- Load Plotly.js for charting -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            background-color: #f9fafb;
+            color: #333;
+        }
+        #sidebar {
+            width: 320px;
+            padding: 30px;
+            background: #ffffff;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            z-index: 10;
+        }
+        h2 {
+            margin: 0 0 10px 0;
+            font-size: 1.4rem;
+            color: #111;
+        }
+        p.desc {
+            font-size: 0.9rem;
+            color: #666;
+            margin: 0;
+            line-height: 1.4;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        .val-display {
+            color: #0066cc;
+            font-family: monospace;
+        }
+        input[type=range] {
+            width: 100%;
+            cursor: pointer;
+        }
+        #plot-container {
+            flex-grow: 1;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #plot {
+            width: 100%;
+            height: 100%;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <div>
+            <h2>Optimizer Dynamics</h2>
+            <p class="desc">Watch how Nesterov (NAG) looks ahead to brake earlier, while Classical Momentum overshoots heavily on a steep loss landscape.</p>
+        </div>
+
+        <div class="control-group">
+            <div class="control-header">
+                <label for="lr">Learning Rate (α)</label>
+                <span class="val-display" id="lr-val">0.020</span>
+            </div>
+            <input type="range" id="lr" min="0.001" max="0.08" step="0.001" value="0.02">
+        </div>
+
+        <div class="control-group">
+            <div class="control-header">
+                <label for="beta">Momentum (β)</label>
+                <span class="val-display" id="beta-val">0.90</span>
+            </div>
+            <input type="range" id="beta" min="0.0" max="0.99" step="0.01" value="0.90">
+        </div>
+
+        <div class="control-group">
+            <div class="control-header">
+                <label for="iters">Iterations</label>
+                <span class="val-display" id="iters-val">50</span>
+            </div>
+            <input type="range" id="iters" min="10" max="150" step="1" value="50">
+        </div>
+    </div>
+
+    <div id="plot-container">
+        <div id="plot"></div>
+    </div>
+
+    <script>
+        // Objective function: f(x,y) = x^2 + 10y^2 (Ill-conditioned bowl)
+        const a = 1;
+        const b = 10;
+
+        // Gradient of f(x,y)
+        function grad_f(x, y) {
+            return { dx: 2 * a * x, dy: 2 * b * y };
+        }
+
+        // Generate static contour background data
+        function getContourData() {
+            let x = [], y = [], z = [];
+            for (let i = -10; i <= 10; i += 0.5) x.push(i);
+            for (let j = -10; j <= 10; j += 0.5) y.push(j);
+            
+            for (let j = 0; j < y.length; j++) {
+                let z_row = [];
+                for (let i = 0; i < x.length; i++) {
+                    z_row.push(a * x[i]*x[i] + b * y[j]*y[j]);
+                }
+                z.push(z_row);
+            }
+            return {
+                type: 'contour', x: x, y: y, z: z,
+                colorscale: 'Greys', opacity: 0.3,
+                showscale: false, contours: { coloring: 'lines' }
+            };
+        }
+
+        // Simulate optimization paths
+        function simulatePaths(lr, beta, iters) {
+            // Start at (-8, -8)
+            let start_x = -8, start_y = -8;
+            
+            // Classical Momentum state
+            let cm_x = start_x, cm_y = start_y;
+            let cm_vx = 0, cm_vy = 0;
+            let path_cm = { x: [cm_x], y: [cm_y] };
+
+            // Nesterov state
+            let nag_x = start_x, nag_y = start_y;
+            let nag_vx = 0, nag_vy = 0;
+            let path_nag = { x: [nag_x], y: [nag_y] };
+
+            for (let i = 0; i < iters; i++) {
+                // Classical Momentum Step
+                let g_cm = grad_f(cm_x, cm_y);
+                cm_vx = beta * cm_vx - lr * g_cm.dx;
+                cm_vy = beta * cm_vy - lr * g_cm.dy;
+                cm_x += cm_vx;
+                cm_y += cm_vy;
+                path_cm.x.push(cm_x);
+                path_cm.y.push(cm_y);
+
+                // Nesterov Accelerated Gradient Step
+                let lookahead_x = nag_x + beta * nag_vx;
+                let lookahead_y = nag_y + beta * nag_vy;
+                let g_nag = grad_f(lookahead_x, lookahead_y);
+                
+                nag_vx = beta * nag_vx - lr * g_nag.dx;
+                nag_vy = beta * nag_vy - lr * g_nag.dy;
+                nag_x += nag_vx;
+                nag_y += nag_vy;
+                path_nag.x.push(nag_x);
+                path_nag.y.push(nag_y);
+            }
+
+            return { path_cm, path_nag };
+        }
+
+        const contourTrace = getContourData();
+
+        function updatePlot() {
+            const lr = parseFloat(document.getElementById('lr').value);
+            const beta = parseFloat(document.getElementById('beta').value);
+            const iters = parseInt(document.getElementById('iters').value);
+
+            // Update UI text
+            document.getElementById('lr-val').innerText = lr.toFixed(3);
+            document.getElementById('beta-val').innerText = beta.toFixed(2);
+            document.getElementById('iters-val').innerText = iters;
+
+            // Compute paths
+            const { path_cm, path_nag } = simulatePaths(lr, beta, iters);
+
+            const traceCM = {
+                x: path_cm.x, y: path_cm.y,
+                mode: 'lines+markers',
+                name: 'Classical Momentum',
+                line: { color: '#ff4b4b', width: 2 },
+                marker: { size: 4 }
+            };
+
+            const traceNAG = {
+                x: path_nag.x, y: path_nag.y,
+                mode: 'lines+markers',
+                name: 'Nesterov (NAG)',
+                line: { color: '#0066cc', width: 2 },
+                marker: { size: 4 }
+            };
+
+            const targetTrace = {
+                x: [0], y: [0],
+                mode: 'markers',
+                name: 'Global Minimum',
+                marker: { size: 12, color: 'gold', symbol: 'star', line: { color: 'black', width: 1 } }
+            };
+
+            const layout = {
+                title: 'Loss Landscape Trajectory (Top-Down View)',
+                xaxis: { title: 'Parameter X', range: [-10, 10] },
+                yaxis: { title: 'Parameter Y', range: [-10, 10] },
+                margin: { l: 50, r: 50, b: 50, t: 50 },
+                legend: { x: 0, y: 1, bgcolor: 'rgba(255,255,255,0.8)' },
+                hovermode: 'closest'
+            };
+
+            Plotly.react('plot', [contourTrace, traceCM, traceNAG, targetTrace], layout);
+        }
+
+        // Attach event listeners to sliders
+        ['lr', 'beta', 'iters'].forEach(id => {
+            document.getElementById(id).addEventListener('input', updatePlot);
+        });
+
+        // Initial render
+        updatePlot();
+    </script>
+</body>
+</html>

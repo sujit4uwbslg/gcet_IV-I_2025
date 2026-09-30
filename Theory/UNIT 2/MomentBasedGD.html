@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Momentum Gradient Descent Animation</title>
+
+<style>
+body{
+    font-family: Arial, sans-serif;
+    background:#f5f5f5;
+    text-align:center;
+}
+
+.container{
+    width:1000px;
+    margin:auto;
+}
+
+.controls{
+    background:white;
+    padding:15px;
+    border-radius:10px;
+    margin-bottom:20px;
+    box-shadow:0 2px 5px rgba(0,0,0,0.2);
+}
+
+input{
+    width:80px;
+    padding:5px;
+    margin:5px;
+}
+
+button{
+    padding:8px 15px;
+    margin:5px;
+    cursor:pointer;
+}
+
+canvas{
+    background:white;
+    border:1px solid #ccc;
+}
+
+.info{
+    margin-top:15px;
+    font-size:18px;
+    font-weight:bold;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<h1>Momentum-Based Gradient Descent Animation</h1>
+
+<div class="controls">
+    Initial W1:
+    <input type="number" id="w1" value="4" step="0.1">
+
+    Initial W2:
+    <input type="number" id="w2" value="3" step="0.1">
+
+    Learning Rate η:
+    <input type="number" id="lr" value="0.05" step="0.01">
+
+    Momentum β:
+    <input type="number" id="beta" value="0.9" step="0.01">
+
+    Iterations:
+    <input type="number" id="iters" value="50">
+
+    <button onclick="startAnimation()">Start</button>
+</div>
+
+<canvas id="canvas" width="800" height="600"></canvas>
+
+<div class="info" id="status">
+Iteration: 0
+</div>
+
+</div>
+
+<script>
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+const WIDTH = canvas.width;
+const HEIGHT = canvas.height;
+
+let path = [];
+let currentStep = 0;
+let animation;
+
+function worldToCanvas(x,y)
+{
+    const scale = 60;
+
+    return {
+        x: WIDTH/2 + x*scale,
+        y: HEIGHT/2 - y*scale
+    };
+}
+
+function drawContours()
+{
+    ctx.clearRect(0,0,WIDTH,HEIGHT);
+
+    ctx.strokeStyle="#ddd";
+    ctx.lineWidth=1;
+
+    for(let r=1;r<=7;r++)
+    {
+        ctx.beginPath();
+        ctx.arc(WIDTH/2,HEIGHT/2,r*40,0,2*Math.PI);
+        ctx.stroke();
+    }
+
+    ctx.strokeStyle="black";
+
+    ctx.beginPath();
+    ctx.moveTo(0,HEIGHT/2);
+    ctx.lineTo(WIDTH,HEIGHT/2);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(WIDTH/2,0);
+    ctx.lineTo(WIDTH/2,HEIGHT);
+    ctx.stroke();
+
+    ctx.fillStyle="red";
+    ctx.beginPath();
+    ctx.arc(WIDTH/2,HEIGHT/2,6,0,2*Math.PI);
+    ctx.fill();
+
+    ctx.fillText("Minimum (0,0)", WIDTH/2+10, HEIGHT/2-10);
+}
+
+function drawPath(step)
+{
+    drawContours();
+
+    ctx.strokeStyle="blue";
+    ctx.lineWidth=3;
+
+    ctx.beginPath();
+
+    for(let i=0;i<=step;i++)
+    {
+        const p = worldToCanvas(path[i].w1,path[i].w2);
+
+        if(i===0)
+            ctx.moveTo(p.x,p.y);
+        else
+            ctx.lineTo(p.x,p.y);
+    }
+
+    ctx.stroke();
+
+    for(let i=0;i<=step;i++)
+    {
+        const p = worldToCanvas(path[i].w1,path[i].w2);
+
+        ctx.fillStyle="green";
+        ctx.beginPath();
+        ctx.arc(p.x,p.y,4,0,2*Math.PI);
+        ctx.fill();
+    }
+
+    const p = worldToCanvas(path[step].w1,path[step].w2);
+
+    ctx.fillStyle="orange";
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,8,0,2*Math.PI);
+    ctx.fill();
+
+    document.getElementById("status").innerHTML =
+        `Iteration: ${step}
+         | W1=${path[step].w1.toFixed(4)}
+         | W2=${path[step].w2.toFixed(4)}
+         | Loss=${path[step].loss.toFixed(6)}`;
+}
+
+function computeMomentumGD(w1,w2,lr,beta,iters)
+{
+    let v1 = 0;
+    let v2 = 0;
+
+    let result=[];
+
+    for(let t=0;t<=iters;t++)
+    {
+        const loss = w1*w1 + w2*w2;
+
+        result.push({
+            w1:w1,
+            w2:w2,
+            loss:loss
+        });
+
+        const g1 = 2*w1;
+        const g2 = 2*w2;
+
+        v1 = beta*v1 + lr*g1;
+        v2 = beta*v2 + lr*g2;
+
+        w1 = w1 - v1;
+        w2 = w2 - v2;
+    }
+
+    return result;
+}
+
+function animate()
+{
+    drawPath(currentStep);
+
+    currentStep++;
+
+    if(currentStep >= path.length)
+    {
+        clearInterval(animation);
+    }
+}
+
+function startAnimation()
+{
+    clearInterval(animation);
+
+    const w1 = parseFloat(document.getElementById("w1").value);
+    const w2 = parseFloat(document.getElementById("w2").value);
+    const lr = parseFloat(document.getElementById("lr").value);
+    const beta = parseFloat(document.getElementById("beta").value);
+    const iters = parseInt(document.getElementById("iters").value);
+
+    path = computeMomentumGD(
+        w1,
+        w2,
+        lr,
+        beta,
+        iters
+    );
+
+    currentStep = 0;
+
+    animation = setInterval(
+        animate,
+        200
+    );
+}
+
+drawContours();
+
+</script>
+
+</body>
+</html>
