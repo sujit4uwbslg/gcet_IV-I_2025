@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Multi Layer Perceptron Visualizer</title>
+
+<style>
+body{
+    font-family:Arial,Helvetica,sans-serif;
+    margin:20px;
+    background:#f4f4f4;
+}
+
+.container{
+    width:95%;
+    margin:auto;
+}
+
+.controls{
+    background:white;
+    padding:15px;
+    border-radius:10px;
+    margin-bottom:15px;
+    box-shadow:0 0 10px rgba(0,0,0,0.15);
+}
+
+label{
+    font-weight:bold;
+}
+
+input{
+    width:70px;
+    padding:5px;
+    margin:5px;
+}
+
+button{
+    padding:8px 15px;
+    margin-top:10px;
+    cursor:pointer;
+    background:#1976d2;
+    color:white;
+    border:none;
+    border-radius:5px;
+}
+
+button:hover{
+    background:#0d47a1;
+}
+
+#layerInputs{
+    margin-top:15px;
+}
+
+canvas{
+    background:white;
+    border:1px solid gray;
+    border-radius:10px;
+}
+</style>
+
+</head>
+<body>
+
+<div class="container">
+
+<div class="controls">
+
+<label>Number of Layers :</label>
+
+<input type="number" id="numLayers" min="2" value="3">
+
+<button onclick="createInputs()">Create Layer Inputs</button>
+
+<div id="layerInputs"></div>
+
+<button onclick="drawNetwork()">Draw Network</button>
+
+</div>
+
+<canvas id="networkCanvas"></canvas>
+
+</div>
+
+<script>
+
+function createInputs(){
+
+    let n=parseInt(document.getElementById("numLayers").value);
+
+    let div=document.getElementById("layerInputs");
+
+    div.innerHTML="";
+
+    for(let i=0;i<n;i++){
+
+        let label=document.createElement("label");
+        label.innerHTML="Layer "+(i+1)+" Neurons : ";
+
+        let input=document.createElement("input");
+        input.type="number";
+        input.min=1;
+        input.value=3;
+        input.id="layer"+i;
+
+        div.appendChild(label);
+        div.appendChild(input);
+        div.appendChild(document.createElement("br"));
+
+    }
+
+}
+
+createInputs();
+
+function drawNetwork(){
+
+    let layers=[];
+
+    let n=parseInt(document.getElementById("numLayers").value);
+
+    for(let i=0;i<n;i++){
+
+        layers.push(parseInt(document.getElementById("layer"+i).value));
+
+    }
+
+    let canvas=document.getElementById("networkCanvas");
+    let ctx=canvas.getContext("2d");
+
+    let width=Math.max(900,n*180);
+    let maxNeurons=Math.max(...layers);
+    let height=Math.max(500,maxNeurons*100);
+
+    canvas.width=width;
+    canvas.height=height;
+
+    ctx.clearRect(0,0,width,height);
+
+    const radius=18;
+
+    let neuronPos=[];
+
+    let layerGap=width/(layers.length+1);
+
+    for(let i=0;i<layers.length;i++){
+
+        neuronPos[i]=[];
+
+        let neurons=layers[i];
+
+        let neuronGap=height/(neurons+1);
+
+        for(let j=0;j<neurons;j++){
+
+            let x=(i+1)*layerGap;
+            let y=(j+1)*neuronGap;
+
+            neuronPos[i].push({x:x,y:y});
+
+        }
+
+    }
+
+    // Draw Connections
+
+    ctx.strokeStyle="#888";
+    ctx.lineWidth=1.5;
+
+    for(let i=0;i<layers.length-1;i++){
+
+        neuronPos[i].forEach(a=>{
+
+            neuronPos[i+1].forEach(b=>{
+
+                ctx.beginPath();
+                ctx.moveTo(a.x,a.y);
+                ctx.lineTo(b.x,b.y);
+                ctx.stroke();
+
+            });
+
+        });
+
+    }
+
+    // Draw Neurons
+
+    neuronPos.forEach((layer,index)=>{
+
+        layer.forEach((p,j)=>{
+
+            ctx.beginPath();
+            ctx.arc(p.x,p.y,radius,0,2*Math.PI);
+            ctx.fillStyle="#4CAF50";
+            ctx.fill();
+
+            ctx.strokeStyle="black";
+            ctx.lineWidth=2;
+            ctx.stroke();
+
+            ctx.fillStyle="white";
+            ctx.font="12px Arial";
+            ctx.textAlign="center";
+            ctx.textBaseline="middle";
+            ctx.fillText(j+1,p.x,p.y);
+
+        });
+
+    });
+
+    // Layer Names
+
+    ctx.fillStyle="black";
+    ctx.font="16px Arial";
+
+    for(let i=0;i<layers.length;i++){
+
+        let x=(i+1)*layerGap;
+
+        let title="Hidden";
+
+        if(i==0) title="Input";
+        if(i==layers.length-1) title="Output";
+
+        ctx.fillText(title,x-25,30);
+
+    }
+
+}
+
+drawNetwork();
+
+</script>
+
+</body>
+</html>
